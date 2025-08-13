@@ -50,13 +50,31 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_DIR="$(dirname "$SCRIPT_DIR")"
 TARGET_NAME="$(basename "$TARGET_DIR")"
+PROJECT_ROOT="$(dirname "$(dirname "$TARGET_DIR")")"
 
 RUN_NUMBER="${1:-1}"
 
 echo "启动 $TARGET_NAME 模糊测试实验，运行次数: $RUN_NUMBER"
 
+# 检查环境变量
+if [[ -z "$HTTPS_PROXY" ]]; then
+    echo "警告: HTTPS_PROXY 环境变量未设置"
+fi
+
+if [[ -z "$LLM_API_KEY" ]]; then
+    echo "警告: LLM_API_KEY 环境变量未设置"
+fi
+
 # 设置环境变量
 export RUN_NUMBER="$RUN_NUMBER"
+
+# 检查是否有 .env 文件
+if [[ -f "$PROJECT_ROOT/.env" ]]; then
+    echo "加载 .env 文件..."
+    source "$PROJECT_ROOT/.env"
+elif [[ -f "$PROJECT_ROOT/env.example" ]]; then
+    echo "未找到 .env 文件，请参考 env.example 创建"
+fi
 
 # 切换到目标目录
 cd "$TARGET_DIR"

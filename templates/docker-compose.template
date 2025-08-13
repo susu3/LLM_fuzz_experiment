@@ -10,8 +10,8 @@ services:
     restart: unless-stopped
     environment:
       - RUN_NUMBER=${RUN_NUMBER:-1}
-      - HTTPS_PROXY=http://hwcloud-hk.ring0.me:48527
-      - LLM_API_KEY=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
+      - HTTPS_PROXY=${HTTPS_PROXY}
+      - LLM_API_KEY=${LLM_API_KEY}
     volumes:
       - ../../results:/opt/fuzzing/results
       - ../../logs:/opt/fuzzing/logs

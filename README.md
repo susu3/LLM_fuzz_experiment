@@ -95,11 +95,30 @@ cd targets/libmodbus
 
 ## ⚙️ 环境配置
 
-实验需要以下环境变量（已在Docker中自动设置）：
+实验需要以下环境变量，请在服务器上手动设置：
+
+### 方法1：直接设置环境变量
 
 ```bash
-export HTTPS_PROXY=http://hwcloud-hk.ring0.me:48527
-export LLM_API_KEY=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
+export HTTPS_PROXY=XXX
+export LLM_API_KEY=XXX
+```
+
+### 方法2：使用环境配置文件
+
+```bash
+# 复制配置文件模板
+cp env.example .env
+
+# 编辑配置文件，设置实际的代理和API密钥值
+vim .env
+```
+
+### 验证环境变量
+
+```bash
+echo "HTTPS_PROXY: $HTTPS_PROXY"
+echo "LLM_API_KEY: $LLM_API_KEY"
 ```
 
 ## 📊 实验特性
@@ -137,6 +156,7 @@ export LLM_API_KEY=sk-or-v1-a03efef05947a947d3fd9ce769ceb3f297f2ba4bf4eb3ead3849
 - [安装配置指南](docs/setup_guide.md)
 - [使用说明](docs/usage_guide.md)
 - [扩展指南](docs/extension_guide.md)
+- [安全使用指南](docs/security_guide.md)
 - [故障排除](docs/troubleshooting.md)
 
 ## 🎯 实验命令对比

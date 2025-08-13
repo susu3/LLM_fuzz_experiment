@@ -3,8 +3,7 @@ FROM {{base_image}} as {{tool_name}}-{{target_name}}
 # 设置环境变量
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Shanghai
-ENV HTTPS_PROXY=http://hwcloud-hk.ring0.me:48527
-ENV LLM_API_KEY=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
+# HTTPS_PROXY 和 LLM_API_KEY 将通过docker-compose或docker run传入
 
 # 安装依赖
 RUN apt-get update && apt-get install -y \

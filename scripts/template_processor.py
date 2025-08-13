@@ -69,8 +69,8 @@ def process_compose_template(config, template_path, output_path):
     restart: unless-stopped
     environment:
       - RUN_NUMBER=${{RUN_NUMBER:-1}}
-      - HTTPS_PROXY=http://hwcloud-hk.ring0.me:48527
-      - LLM_API_KEY=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
+      - HTTPS_PROXY=${{HTTPS_PROXY}}
+      - LLM_API_KEY=${{LLM_API_KEY}}
     volumes:
       - ../../results:/opt/fuzzing/results
       - ../../logs:/opt/fuzzing/logs
@@ -83,7 +83,7 @@ def process_compose_template(config, template_path, output_path):
         services_section += service_template
     
     # 替换模板变量
-    result = template.replace('{{#tools}}\n  {{tool_name}}-{{target_name}}:\n    build:\n      context: ../../\n      dockerfile: dockerfiles/Dockerfile.{{tool_name}}.{{target_name}}\n    container_name: {{tool_name}}-{{target_name}}\n    restart: unless-stopped\n    environment:\n      - RUN_NUMBER=${RUN_NUMBER:-1}\n      - HTTPS_PROXY=http://hwcloud-hk.ring0.me:48527\n      - LLM_API_KEY=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\n    volumes:\n      - ../../results:/opt/fuzzing/results\n      - ../../logs:/opt/fuzzing/logs\n      - {{target_source_path}}:/opt/fuzzing/targets/{{target_name}}:ro\n    networks:\n      - fuzzing-network\n    command: /opt/fuzzing/run_24h.sh\n    \n{{/tools}}', services_section.rstrip())
+    result = template.replace('{{#tools}}\n  {{tool_name}}-{{target_name}}:\n    build:\n      context: ../../\n      dockerfile: dockerfiles/Dockerfile.{{tool_name}}.{{target_name}}\n    container_name: {{tool_name}}-{{target_name}}\n    restart: unless-stopped\n    environment:\n      - RUN_NUMBER=${RUN_NUMBER:-1}\n      - HTTPS_PROXY=${HTTPS_PROXY}\n      - LLM_API_KEY=${LLM_API_KEY}\n    volumes:\n      - ../../results:/opt/fuzzing/results\n      - ../../logs:/opt/fuzzing/logs\n      - {{target_source_path}}:/opt/fuzzing/targets/{{target_name}}:ro\n    networks:\n      - fuzzing-network\n    command: /opt/fuzzing/run_24h.sh\n    \n{{/tools}}', services_section.rstrip())
     
     # 写入输出文件
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
