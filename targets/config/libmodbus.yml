@@ -1,0 +1,59 @@
+target:
+  name: libmodbus
+  source_path: /home/ecs-user/libmodbus
+  port: 1502
+  protocol: MODBUS
+  
+  # 目标特定的编译配置
+  build:
+    base_image: ubuntu:20.04
+    dependencies:
+      - libmodbus-dev
+      - autotools-dev
+    environment_vars:
+      - "AFL_HARDEN=1"
+      - "CC=afl-gcc"
+      - "CXX=afl-g++"
+    pre_build_commands:
+      - "cd /opt/fuzzing/targets/libmodbus && ./autogen.sh"
+      - "cd /opt/fuzzing/targets/libmodbus && ./configure --enable-static"
+    build_commands:
+      - "cd /opt/fuzzing/targets/libmodbus && make clean"
+      - "cd /opt/fuzzing/targets/libmodbus && make CC=afl-gcc"
+    post_build_commands:
+      - "cd /opt/fuzzing/targets/libmodbus && cp tests/.libs/unit-test-server ./server"
+      - "cd /opt/fuzzing/targets/libmodbus && chmod +x ./server"
+
+tools:
+  afl-ics:
+    repo: git@github.com:susu3/AFL-ICS.git
+    build_commands:
+      - "make clean all"
+    command: "afl-fuzz -d -i /opt/fuzzing/A2/tutorials/libmodbus/in-modbus -o $OUTPUT_DIR -N tcp://127.0.0.1/1502 -P MODBUS -r /opt/fuzzing/A2/sample_specs/Markdown/modbus.md -D 10000 -q 3 -s 3 -E -K -R ./server 1502"
+    needs_spec: true
+    
+  aflnet:
+    repo: git@github.com:susu3/aflnet-ICS-.git
+    build_commands:
+      - "make clean all"
+    command: "afl-fuzz -d -i /opt/fuzzing/A2/tutorials/libmodbus/in-modbus -o $OUTPUT_DIR -N tcp://127.0.0.1/1502 -P MODBUS -D 10000 -q 3 -s 3 -E -K -R ./server 1502"
+    needs_spec: false
+    
+  chatafl:
+    repo: git@github.com:susu3/ChatAFL.git
+    build_commands:
+      - "make clean all"
+    command: "afl-fuzz -d -i /opt/fuzzing/A2/tutorials/libmodbus/in-modbus -o $OUTPUT_DIR -N tcp://127.0.0.1/1502 -P MODBUS -D 10000 -q 3 -s 3 -E -K -R ./server 1502"
+    needs_spec: false
+    
+  a2:
+    repo: git@github.com:susu3/A2.git
+    build_commands:
+      - "make clean all"
+    command: "afl-fuzz -d -i /opt/fuzzing/A2/tutorials/libmodbus/in-modbus -o $OUTPUT_DIR -N tcp://127.0.0.1/1502 -P MODBUS -r /opt/fuzzing/A2/sample_specs/Markdown/modbus.md -D 10000 -q 3 -s 3 -E -K -R ./server 1502"
+    needs_spec: true
+
+experiment:
+  duration: 24h
+  parallel: true
+  auto_collect_results: true

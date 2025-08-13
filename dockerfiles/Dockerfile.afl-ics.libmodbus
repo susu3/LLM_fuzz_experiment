@@ -1,0 +1,83 @@
+FROM ubuntu:20.04 as afl-ics-libmodbus
+
+# 设置环境变量
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Shanghai
+ENV HTTPS_PROXY=http://hwcloud-hk.ring0.me:48527
+ENV LLM_API_KEY=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
+
+# 安装依赖
+RUN apt-get update && apt-get install -y \
+    build-essential gcc g++ make cmake git wget curl \
+    python3 python3-pip libtool autoconf automake bison \
+    libglib2.0-dev libpixman-1-dev clang llvm pkg-config \
+    libmodbus-dev autotools-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt/fuzzing
+
+# 克隆并编译工具
+RUN git clone git@github.com:susu3/AFL-ICS.git tools/afl-ics
+WORKDIR /opt/fuzzing/tools/afl-ics
+RUN make clean all
+
+# 克隆A2工具（提供输入文件和规范文件）
+WORKDIR /opt/fuzzing
+RUN git clone git@github.com:susu3/A2.git A2
+
+# 复制目标程序
+COPY /home/ecs-user/libmodbus /opt/fuzzing/targets/libmodbus/
+WORKDIR /opt/fuzzing/targets/libmodbus
+
+# 设置目标特定的环境变量
+ENV AFL_HARDEN=1
+ENV CC=afl-gcc
+ENV CXX=afl-g++
+
+# 目标编译前的准备命令
+RUN cd /opt/fuzzing/targets/libmodbus && ./autogen.sh
+RUN cd /opt/fuzzing/targets/libmodbus && ./configure --enable-static
+
+# 编译目标程序
+RUN cd /opt/fuzzing/targets/libmodbus && make clean
+RUN cd /opt/fuzzing/targets/libmodbus && make CC=afl-gcc
+
+# 编译后处理命令
+RUN cd /opt/fuzzing/targets/libmodbus && cp tests/.libs/unit-test-server ./server
+RUN cd /opt/fuzzing/targets/libmodbus && chmod +x ./server
+
+# 设置PATH
+ENV PATH="/opt/fuzzing/tools/afl-ics:$PATH"
+
+# 创建运行脚本
+RUN echo '#!/bin/bash\n\
+set -e\n\
+cd /opt/fuzzing/targets/libmodbus\n\
+RUN_NUMBER=${RUN_NUMBER:-1}\n\
+OUTPUT_DIR="/opt/fuzzing/results/afl-ics-out-libmodbus-${RUN_NUMBER}"\n\
+mkdir -p "$OUTPUT_DIR"\n\
+echo "Starting afl-ics fuzzing for libmodbus, run #${RUN_NUMBER}"\n\
+echo "Output directory: $OUTPUT_DIR"\n\
+echo "Command: afl-fuzz -d -i /opt/fuzzing/A2/tutorials/libmodbus/in-modbus -o $OUTPUT_DIR -N tcp://127.0.0.1/1502 -P MODBUS -r /opt/fuzzing/A2/sample_specs/Markdown/modbus.md -D 10000 -q 3 -s 3 -E -K -R ./server 1502"\n\
+exec afl-fuzz -d -i /opt/fuzzing/A2/tutorials/libmodbus/in-modbus -o $OUTPUT_DIR -N tcp://127.0.0.1/1502 -P MODBUS -r /opt/fuzzing/A2/sample_specs/Markdown/modbus.md -D 10000 -q 3 -s 3 -E -K -R ./server 1502' > /opt/fuzzing/run_experiment.sh && \
+    chmod +x /opt/fuzzing/run_experiment.sh
+
+# 创建24小时超时脚本
+RUN echo '#!/bin/bash\n\
+echo "Starting 24-hour fuzzing session..."\n\
+timeout 24h /opt/fuzzing/run_experiment.sh\n\
+EXIT_CODE=$?\n\
+if [ $EXIT_CODE -eq 124 ]; then\n\
+    echo "Fuzzing completed after 24 hours (timeout)"\n\
+else\n\
+    echo "Fuzzing ended with exit code: $EXIT_CODE"\n\
+fi\n\
+echo "Fuzzing session finished at $(date)"' > /opt/fuzzing/run_24h.sh && \
+    chmod +x /opt/fuzzing/run_24h.sh
+
+# 设置权限
+RUN chown -R fuzzer:fuzzer /opt/fuzzing
+USER fuzzer
+
+# 保持容器运行
+CMD ["/opt/fuzzing/run_24h.sh"]

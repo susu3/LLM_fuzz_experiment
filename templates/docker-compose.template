@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+{{#tools}}
+  {{tool_name}}-{{target_name}}:
+    build:
+      context: ../../
+      dockerfile: dockerfiles/Dockerfile.{{tool_name}}.{{target_name}}
+    container_name: {{tool_name}}-{{target_name}}
+    restart: unless-stopped
+    environment:
+      - RUN_NUMBER=${RUN_NUMBER:-1}
+      - HTTPS_PROXY=http://hwcloud-hk.ring0.me:48527
+      - LLM_API_KEY=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
+    volumes:
+      - ../../results:/opt/fuzzing/results
+      - ../../logs:/opt/fuzzing/logs
+      - {{target_source_path}}:/opt/fuzzing/targets/{{target_name}}:ro
+    networks:
+      - fuzzing-network
+    command: /opt/fuzzing/run_24h.sh
+    
+{{/tools}}
+
+networks:
+  fuzzing-network:
+    driver: bridge
+
+volumes:
+  results:
+  logs:
