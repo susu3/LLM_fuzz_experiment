@@ -1,0 +1,87 @@
+FROM registry.cn-hangzhou.aliyuncs.com/acs/ubuntu:20.04
+
+# Avoid interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Configure package mirrors before any installation
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu/|http://mirrors.aliyun.com/ubuntu/|g' /etc/apt/sources.list && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt-get update --fix-missing
+
+# Install build tools
+RUN apt-get install -y --fix-missing \
+    build-essential \
+    git \
+    wget \
+    autoconf \
+    libtool \
+    pkg-config \
+    make \
+    automake \
+    gcc \
+    g++
+
+# Install Python and other dependencies
+RUN apt-get install -y --fix-missing \
+    python3 \
+    python3-pip \
+    patch \
+    vim \
+    graphviz-dev \
+    libcap-dev \
+    tmux \
+    tcpdump \
+    watch \
+    net-tools \
+    iputils-ping \
+    iproute2 \
+    procps
+
+# Install LLVM and Clang
+RUN apt-get install -y --fix-missing \
+    clang \
+    llvm \
+    llvm-10 \
+    llvm-10-tools \
+    llvm-10-runtime
+
+# Set working directory
+WORKDIR /opt/fuzzing
+
+# 克隆并编译A2工具
+RUN git clone git@github.com:susu3/A2.git a2 && \
+    cd A2 && \
+    make clean all && \
+    cd llvm_mode && make
+
+# 直接复制libmodbus目标程序（无需编译）
+COPY /home/ecs-user/libmodbus /opt/fuzzing/libmodbus
+
+# 设置PATH
+ENV PATH="/opt/fuzzing/a2:$PATH"
+
+# 创建输出目录
+RUN mkdir -p /opt/fuzzing/results
+
+# 设置用户和权限
+RUN useradd -m -s /bin/bash fuzzer && \
+    chown -R fuzzer:fuzzer /opt/fuzzing
+USER fuzzer
+
+# 创建启动脚本支持次数参数
+RUN echo '#!/bin/bash\n\
+RUN_NUM=${RUN_NUM:-1}\n\
+OUTPUT_DIR="/opt/fuzzing/results/a2-out-libmodbus-${RUN_NUM}"\n\
+echo "Starting A2 fuzzing run #${RUN_NUM}"\n\
+echo "Output directory: ${OUTPUT_DIR}"\n\
+cd /opt/fuzzing/targets/libmodbus/tests && \\\n\
+afl-fuzz -d -i /opt/fuzzing/a2/tutorials/libmodbus/in-modbus \\\n\
+  -o "${OUTPUT_DIR}" \\\n\
+  -N tcp://127.0.0.1/1502 -P MODBUS \\\n\
+  -r /opt/fuzzing/a2/sample_specs/Markdown/modbus.md \\\n\
+  -D 10000 -q 3 -s 3 -E -K -R ./server 1502' > /opt/fuzzing/start_fuzzing.sh && \
+    chmod +x /opt/fuzzing/start_fuzzing.sh
+
+# 启动模糊测试（A2使用自己的输入文件和规范文件）
+CMD ["/opt/fuzzing/start_fuzzing.sh"]

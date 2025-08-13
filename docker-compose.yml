@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  afl-ics-libmodbus:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.libmodbus.afl-ics
+    container_name: afl-ics-libmodbus
+    restart: unless-stopped
+    environment:
+      - HTTPS_PROXY=${HTTPS_PROXY}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM:-1}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network
+
+  aflnet-libmodbus:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.libmodbus.aflnet
+    container_name: aflnet-libmodbus
+    restart: unless-stopped
+    environment:
+      - HTTPS_PROXY=${HTTPS_PROXY}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM:-1}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network
+
+  chatafl-libmodbus:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.libmodbus.chatafl
+    container_name: chatafl-libmodbus
+    restart: unless-stopped
+    environment:
+      - HTTPS_PROXY=${HTTPS_PROXY}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM:-1}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network
+
+  a2-libmodbus:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.libmodbus.a2
+    container_name: a2-libmodbus
+    restart: unless-stopped
+    environment:
+      - HTTPS_PROXY=${HTTPS_PROXY}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM:-1}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network
+
+networks:
+  fuzzing-network:
+    driver: bridge
