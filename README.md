@@ -41,6 +41,10 @@ vim .env  # 编辑设置真实值
 ### 2. 启动所有容器并自动开始模糊测试
 
 ```bash
+sudosudo usermod -aG docker $USER
+newgrp docker
+
+```bash
 # 第1次实验（默认）
 ./scripts/start_all.sh
 
