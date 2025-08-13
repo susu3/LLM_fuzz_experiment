@@ -1,13 +1,11 @@
-FROM registry.cn-hangzhou.aliyuncs.com/acs/ubuntu:20.04
+# syntax=docker/dockerfile:1
+FROM ubuntu:20.04
 
 # Avoid interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Configure package mirrors before any installation
-RUN sed -i 's|http://archive.ubuntu.com/ubuntu/|http://mirrors.aliyun.com/ubuntu/|g' /etc/apt/sources.list && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    apt-get update --fix-missing
+# Update package lists
+RUN apt-get update
 
 # Install build tools
 RUN apt-get install -y --fix-missing \
@@ -30,6 +28,9 @@ RUN apt-get install -y --fix-missing \
     vim \
     graphviz-dev \
     libcap-dev \
+    libcurl4-openssl-dev \
+    libjson-c-dev \
+    libpcre2-dev \
     tmux \
     tcpdump \
     watch \
@@ -49,14 +50,17 @@ RUN apt-get install -y --fix-missing \
 # Set working directory
 WORKDIR /opt/fuzzing
 
-# 克隆并编译AFLNet工具
-RUN git clone git@github.com:susu3/aflnet-ICS-.git aflnet-ICS- && \
+# Clone AFLNet using SSH agent forwarding
+RUN --mount=type=ssh \
+    mkdir -p ~/.ssh && \
+    ssh-keyscan github.com >> ~/.ssh/known_hosts && \
+    git clone git@github.com:susu3/aflnet-ICS-.git aflnet-ICS- && \
     cd aflnet-ICS- && \
     make clean all && \
     cd llvm_mode && make
 
 # 直接复制libmodbus目标程序（无需编译）
-COPY /home/ecs-user/libmodbus /opt/fuzzing/libmodbus
+COPY ./libmodbus /opt/fuzzing/libmodbus
 
 # 设置PATH
 ENV PATH="/opt/fuzzing/aflnet-ICS-:$PATH"

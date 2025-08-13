@@ -57,7 +57,7 @@ vim .env  # 编辑设置真实值
 
 ```bash
 # 查看容器状态
-docker-compose ps
+docker compose ps
 
 # 查看模糊测试实时统计信息（以第1次实验为例）
 docker exec afl-ics-libmodbus cat /opt/fuzzing/results/afl-ics-out-libmodbus-1/fuzzer_stats
@@ -66,10 +66,10 @@ docker exec chatafl-libmodbus cat /opt/fuzzing/results/chatafl-out-libmodbus-1/f
 docker exec a2-libmodbus cat /opt/fuzzing/results/a2-out-libmodbus-1/fuzzer_stats
 
 # 查看容器运行日志
-docker-compose logs -f afl-ics-libmodbus
-docker-compose logs -f aflnet-libmodbus
-docker-compose logs -f chatafl-libmodbus
-docker-compose logs -f a2-libmodbus
+docker compose logs -f afl-ics-libmodbus
+docker compose logs -f aflnet-libmodbus
+docker compose logs -f chatafl-libmodbus
+docker compose logs -f a2-libmodbus
 ```
 
 ### 4. （可选）进入容器检查
@@ -136,7 +136,7 @@ docker exec -it a2-libmodbus /bin/bash
 
 1. 修改 `dockerfiles/` 中的 `COPY` 路径指向新目标
 2. 修改启动脚本中的模糊测试命令参数（端口、协议等）
-3. 重新构建: `docker-compose build`
+3. 重新构建: `docker compose build`
 
 ### 方法2：创建新的Dockerfile和compose文件
 

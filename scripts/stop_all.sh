@@ -4,7 +4,7 @@
 
 echo "停止所有模糊测试容器..."
 
-docker-compose down
+docker compose down
 
 echo "所有容器已停止"
 echo ""

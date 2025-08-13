@@ -1,16 +1,16 @@
-version: '3.3'
-
 services:
   afl-ics-libmodbus:
     build:
       context: .
       dockerfile: dockerfiles/Dockerfile.libmodbus.afl-ics
+      ssh:
+        - default
     container_name: afl-ics-libmodbus
     restart: unless-stopped
     environment:
       - HTTPS_PROXY=${HTTPS_PROXY}
       - LLM_API_KEY=${LLM_API_KEY}
-      - RUN_NUM=${RUN_NUM:-1}
+      - RUN_NUM=${RUN_NUM}
     volumes:
       - ./results:/opt/fuzzing/results
     networks:
@@ -20,12 +20,14 @@ services:
     build:
       context: .
       dockerfile: dockerfiles/Dockerfile.libmodbus.aflnet
+      ssh:
+        - default
     container_name: aflnet-libmodbus
     restart: unless-stopped
     environment:
       - HTTPS_PROXY=${HTTPS_PROXY}
       - LLM_API_KEY=${LLM_API_KEY}
-      - RUN_NUM=${RUN_NUM:-1}
+      - RUN_NUM=${RUN_NUM}
     volumes:
       - ./results:/opt/fuzzing/results
     networks:
@@ -40,7 +42,7 @@ services:
     environment:
       - HTTPS_PROXY=${HTTPS_PROXY}
       - LLM_API_KEY=${LLM_API_KEY}
-      - RUN_NUM=${RUN_NUM:-1}
+      - RUN_NUM=${RUN_NUM}
     volumes:
       - ./results:/opt/fuzzing/results
     networks:
@@ -55,7 +57,7 @@ services:
     environment:
       - HTTPS_PROXY=${HTTPS_PROXY}
       - LLM_API_KEY=${LLM_API_KEY}
-      - RUN_NUM=${RUN_NUM:-1}
+      - RUN_NUM=${RUN_NUM}
     volumes:
       - ./results:/opt/fuzzing/results
     networks:
