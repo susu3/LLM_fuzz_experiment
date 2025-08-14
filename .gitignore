@@ -50,7 +50,7 @@ temp/
 
 # Research data
 data/
-results/
+*results*/
 experiments/
 models/
 checkpoints/
