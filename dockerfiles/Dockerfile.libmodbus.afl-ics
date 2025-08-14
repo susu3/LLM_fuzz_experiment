@@ -80,10 +80,10 @@ OUTPUT_DIR="/opt/fuzzing/results/afl-ics-out-libmodbus-${RUN_NUM}"\n\
 echo "Starting AFL-ICS fuzzing run #${RUN_NUM}"\n\
 echo "Output directory: ${OUTPUT_DIR}"\n\
 cd /opt/fuzzing/libmodbus/tests && \\\n\
-afl-fuzz -d -i /opt/fuzzing/afl-ics/tutorials/libmodbus/in-modbus \\\n\
+afl-fuzz -d -i /opt/fuzzing/AFL-ICS/tutorials/libmodbus/in-modbus \\\n\
   -o "${OUTPUT_DIR}" \\\n\
   -N tcp://127.0.0.1/1502 -P MODBUS \\\n\
-  -r /opt/fuzzing/afl-ics/sample_specs/Markdown/modbus.md \\\n\
+  -r /opt/fuzzing/AFL-ICS/sample_specs/Markdown/modbus.md \\\n\
   -D 10000 -q 3 -s 3 -E -K -R ./server 1502' > /opt/fuzzing/start_fuzzing.sh && \
     chmod +x /opt/fuzzing/start_fuzzing.sh
 
