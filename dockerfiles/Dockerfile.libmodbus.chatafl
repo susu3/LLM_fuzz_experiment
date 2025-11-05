@@ -53,6 +53,7 @@ WORKDIR /opt/fuzzing
 RUN git clone https://github.com/susu3/ChatAFL.git chatafl && \
     cd chatafl && \
     cd ChatAFL && \
+    cd ChatAFL && \
     make clean all && \
     cd llvm_mode && make
 
@@ -60,7 +61,7 @@ RUN git clone https://github.com/susu3/ChatAFL.git chatafl && \
 COPY ./libmodbus /opt/fuzzing/libmodbus
 
 # 设置PATH
-ENV PATH="/opt/fuzzing/chatafl/ChatAFL:$PATH"
+ENV PATH="/opt/fuzzing/chatafl/ChatAFL/ChatAFL:$PATH"
 
 # 创建输出目录
 RUN mkdir -p /opt/fuzzing/results
@@ -73,11 +74,11 @@ USER fuzzer
 # 创建启动脚本支持次数参数
 RUN echo '#!/bin/bash\n\
 RUN_NUM=${RUN_NUM:-1}\n\
-OUTPUT_DIR="/opt/fuzzing/results/chatafl-out-libmodbus-${RUN_NUM}"\n\
+OUTPUT_DIR="/opt/fuzzing/results/libmodbus-chatafl-${RUN_NUM}"\n\
 echo "Starting ChatAFL fuzzing run #${RUN_NUM}"\n\
 echo "Output directory: ${OUTPUT_DIR}"\n\
 cd /opt/fuzzing/libmodbus/tests && \\\n\
-afl-fuzz -d -i /opt/fuzzing/chatafl/ChatAFL/tutorials/libmodbus/in-modbus \\\n\
+afl-fuzz -d -i /opt/fuzzing/chatafl/ChatAFL/ChatAFL/tutorials/libmodbus/in-modbus \\\n\
   -o "${OUTPUT_DIR}" \\\n\
   -N tcp://127.0.0.1/1502 -P MODBUS \\\n\
   -D 10000 -q 3 -s 3 -E -K -R ./server 1502' > /opt/fuzzing/start_fuzzing.sh && \

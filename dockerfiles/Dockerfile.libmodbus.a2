@@ -72,7 +72,7 @@ USER fuzzer
 # 创建启动脚本支持次数参数
 RUN echo '#!/bin/bash\n\
 RUN_NUM=${RUN_NUM:-1}\n\
-OUTPUT_DIR="/opt/fuzzing/results/a2-out-libmodbus-${RUN_NUM}"\n\
+OUTPUT_DIR="/opt/fuzzing/results/libmodbus-a2-${RUN_NUM}"\n\
 echo "Starting A2 fuzzing run #${RUN_NUM}"\n\
 echo "Output directory: ${OUTPUT_DIR}"\n\
 cd /opt/fuzzing/libmodbus/tests && \\\n\

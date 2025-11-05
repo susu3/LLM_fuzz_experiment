@@ -1,0 +1,76 @@
+```
+
+### Supplementary Information (TXT)
+```txt
+# MODBUS/TCP Protocol Grammar - Supplementary Information
+
+This document provides additional details, constraints, and field dependencies for the MODBUS/TCP request message grammar.
+
+## General Rules and Dependencies
+
+1.  **MBAP Header 'Length' Field**: The value of the "Length" field in the MBAP header is the count of all subsequent bytes in the frame. This includes the 1-byte "UnitIdentifier" and the entire Protocol Data Unit (PDU). The formula is: `Length = 1 (UnitIdentifier length) + Length of PDU`. The PDU starts with the "FunctionCode" field.
+
+2.  **Protocol Data Unit (PDU) Size Limit**: The maximum size of the MODBUS PDU (Function Code + Data) is 253 bytes. This means the maximum value for the MBAP "Length" field is 254 (1 for UnitIdentifier + 253 for PDU).
+
+3.  **Unit Identifier**: For devices directly connected to a TCP/IP network, the recommended value for "UnitIdentifier" is 0xFF. The value 0 is also accepted. For routing requests through a gateway to a serial line slave, this field should contain the slave address (1-247).
+
+## Message-Specific Field Constraints and Dependencies
+
+### Read Requests
+- **Read_Coils_Request (FC 01)**: The "QuantityOfCoils" field value must be between 1 and 2000 (0x07D0).
+- **Read_Discrete_Inputs_Request (FC 02)**: The "QuantityOfInputs" field value must be between 1 and 2000 (0x07D0).
+- **Read_Holding_Registers_Request (FC 03)**: The "QuantityOfRegisters" field value must be between 1 and 125 (0x007D).
+- **Read_Input_Registers_Request (FC 04)**: The "QuantityOfInputRegisters" field value must be between 1 and 125 (0x007D).
+
+### Write Requests
+- **Write_Single_Coil_Request (FC 05)**: The "OutputValue" field must be either 0xFF00 (for ON) or 0x0000 (for OFF). Other values are illegal.
+
+- **Write_Multiple_Coils_Request (FC 15)**:
+  - "QuantityOfOutputs" value must be between 1 and 1968 (0x07B0).
+  - "ByteCount" value is determined by "QuantityOfOutputs": `ByteCount = ceil(QuantityOfOutputs / 8)`.
+  - The length of the "OutputsValue" field is equal to the "ByteCount" value.
+
+- **Write_Multiple_Registers_Request (FC 16)**:
+  - "QuantityOfRegisters" value must be between 1 and 123 (0x007B).
+  - "ByteCount" value is determined by "QuantityOfRegisters": `ByteCount = QuantityOfRegisters * 2`.
+  - The length of the "RegistersValue" field is equal to the "ByteCount" value.
+
+### File Record Requests
+- **Read_File_Record_Request (FC 20)**:
+  - "ByteCount" is the total length in bytes of the "SubRequests" field.
+  - The "SubRequests" field consists of one or more 7-byte sub-request structures. The number of sub-requests is `ByteCount / 7`.
+  - Each sub-request has the following structure:
+    - `ReferenceType` (1 byte): Must be 0x06.
+    - `FileNumber` (2 bytes): Range 0x0001 to 0xFFFF.
+    - `RecordNumber` (2 bytes): Range 0x0000 to 0x270F.
+    - `RecordLength` (2 bytes): Number of registers to read in this record.
+
+- **Write_File_Record_Request (FC 21)**:
+  - "RequestDataLength" is the total length in bytes of the "SubRequestsData" field.
+  - The "SubRequestsData" field consists of one or more sub-request structures.
+  - Each sub-request has the following variable-length structure:
+    - `ReferenceType` (1 byte): Must be 0x06.
+    - `FileNumber` (2 bytes): Range 0x0001 to 0xFFFF.
+    - `RecordNumber` (2 bytes): Range 0x0000 to 0x270F.
+    - `RecordLength` (2 bytes): N, the number of registers to be written.
+    - `RecordData` (N * 2 bytes): The actual register data to write.
+
+### Other Requests
+- **Read_Write_Multiple_Registers_Request (FC 23)**:
+  - "QuantityToRead" value must be between 1 and 125 (0x007D).
+  - "QuantityToWrite" value must be between 1 and 121 (0x0079).
+  - "WriteByteCount" value is determined by "QuantityToWrite": `WriteByteCount = QuantityToWrite * 2`.
+  - The length of the "WriteRegistersValue" field is equal to the "WriteByteCount" value.
+
+- **CANopen_General_Reference_Request (FC 43/13)**:
+  - The length of the "MEISpecificData" field is calculated as: `MBAP.Length - 3`.
+  - The structure and content of "MEISpecificData" are defined by the CANopen specification and are not detailed here.
+
+- **Read_Device_Identification_Request (FC 43/14)**:
+  - The "ReadDeviceIDCode" field can have the following values:
+    - `0x01`: Get basic device identification.
+    - `0x02`: Get regular device identification.
+    - `0x03`: Get extended device identification.
+    - `0x04`: Get one specific identification object.
+  - The "ObjectId" specifies the starting object for stream access (codes 01-03) or the specific object for individual access (code 04).
+```

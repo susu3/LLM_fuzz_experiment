@@ -16,18 +16,18 @@ TOOLS=("afl-ics" "aflnet" "chatafl" "a2")
 for i in "${!CONTAINERS[@]}"; do
     container="${CONTAINERS[$i]}"
     tool="${TOOLS[$i]}"
-    result_dir="${tool}-out-libmodbus-${RUN_NUMBER}"
+    result_dir="libmodbus-${tool}-${RUN_NUMBER}"
     
     echo "从容器 $container 拷贝结果目录 $result_dir..."
     
     # 检查容器是否存在
     if docker ps -a --format "table {{.Names}}" | grep -q "^${container}$"; then
-        # 拷贝特定次数的结果目录
-        docker cp "$container:/opt/fuzzing/results/$result_dir" "$OUTPUT_DIR/${tool}_results" 2>/dev/null || echo "  警告: 容器 $container 中没有结果目录 $result_dir"
+        # 拷贝特定次数的结果目录（保持原有命名格式）
+        docker cp "$container:/opt/fuzzing/results/$result_dir" "$OUTPUT_DIR/$result_dir" 2>/dev/null || echo "  警告: 容器 $container 中没有结果目录 $result_dir"
         
         # 拷贝AFL统计信息（如果存在）
         docker exec "$container" test -f "/opt/fuzzing/results/$result_dir/fuzzer_stats" && \
-        docker cp "$container:/opt/fuzzing/results/$result_dir/fuzzer_stats" "$OUTPUT_DIR/${tool}_fuzzer_stats" 2>/dev/null || echo "  注意: 未找到 $tool 的统计文件"
+        docker cp "$container:/opt/fuzzing/results/$result_dir/fuzzer_stats" "$OUTPUT_DIR/${result_dir}_fuzzer_stats" 2>/dev/null || echo "  注意: 未找到 $tool 的统计文件"
     else
         echo "  容器 $container 不存在"
     fi

@@ -23,16 +23,16 @@ echo "在容器 $CONTAINER 中运行 $TOOL 模糊测试..."
 
 case "$TOOL" in
     "afl-ics")
-        CMD="afl-fuzz -d -i /opt/fuzzing/AFL-ICS/tutorials/libmodbus/in-modbus -o /opt/fuzzing/results/afl-ics-out-libmodbus-${RUN_NUM} -N tcp://127.0.0.1/1502 -P MODBUS -r /opt/fuzzing/AFL-ICS/sample_specs/Markdown/modbus.md -D 10000 -q 3 -s 3 -E -K -R ./server 1502"
+        CMD="afl-fuzz -d -i /opt/fuzzing/AFL-ICS/tutorials/libmodbus/in-modbus -o /opt/fuzzing/results/libmodbus-afl-ics-${RUN_NUM} -N tcp://127.0.0.1/1502 -P MODBUS -r /opt/fuzzing/AFL-ICS/sample_specs/Markdown/modbus.md -D 10000 -q 3 -s 3 -E -K -R ./server 1502"
         ;;
     "aflnet")
-        CMD="afl-fuzz -d -i /opt/fuzzing/aflnet-ICS-/tutorials/libmodbus/in-modbus -o /opt/fuzzing/results/aflnet-out-libmodbus-${RUN_NUM} -N tcp://127.0.0.1/1502 -P MODBUS -D 10000 -q 3 -s 3 -E -K -R ./server 1502"
+        CMD="afl-fuzz -d -i /opt/fuzzing/aflnet-ICS-/tutorials/libmodbus/in-modbus -o /opt/fuzzing/results/libmodbus-aflnet-${RUN_NUM} -N tcp://127.0.0.1/1502 -P MODBUS -D 10000 -q 3 -s 3 -E -K -R ./server 1502"
         ;;
     "chatafl")
-        CMD="afl-fuzz -d -i /opt/fuzzing/chatafl/ChatAFL/tutorials/libmodbus/in-modbus -o /opt/fuzzing/results/chatafl-out-libmodbus-${RUN_NUM} -N tcp://127.0.0.1/1502 -P MODBUS -D 10000 -q 3 -s 3 -E -K -R ./server 1502"
+        CMD="afl-fuzz -d -i /opt/fuzzing/chatafl/ChatAFL/tutorials/libmodbus/in-modbus -o /opt/fuzzing/results/libmodbus-chatafl-${RUN_NUM} -N tcp://127.0.0.1/1502 -P MODBUS -D 10000 -q 3 -s 3 -E -K -R ./server 1502"
         ;;
     "a2")
-        CMD="afl-fuzz -d -i /opt/fuzzing/A2/tutorials/libmodbus/in-modbus -o /opt/fuzzing/results/a2-out-libmodbus-${RUN_NUM} -N tcp://127.0.0.1/1502 -P MODBUS -r /opt/fuzzing/A2/sample_specs/Markdown/modbus.md -D 10000 -q 3 -s 3 -E -K -R ./server 1502"
+        CMD="afl-fuzz -d -i /opt/fuzzing/A2/tutorials/libmodbus/in-modbus -o /opt/fuzzing/results/libmodbus-a2-${RUN_NUM} -N tcp://127.0.0.1/1502 -P MODBUS -r /opt/fuzzing/A2/sample_specs/Markdown/modbus.md -D 10000 -q 3 -s 3 -E -K -R ./server 1502"
         ;;
     *)
         echo "错误: 不支持的工具 $TOOL"

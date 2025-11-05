@@ -7,10 +7,6 @@ RUN_NUMBER="${1:-1}"
 echo "启动四个模糊测试工具的Docker容器（实验次数: $RUN_NUMBER）..."
 
 # 检查环境变量
-if [[ -z "$HTTPS_PROXY" ]]; then
-    echo "警告: HTTPS_PROXY 环境变量未设置"
-fi
-
 if [[ -z "$LLM_API_KEY" ]]; then
     echo "警告: LLM_API_KEY 环境变量未设置"
 fi
@@ -42,10 +38,10 @@ docker compose ps
 
 echo ""
 echo "查看模糊测试实时状态："
-echo "  docker exec afl-ics-libmodbus cat /opt/fuzzing/results/afl-ics-out-libmodbus-${RUN_NUMBER}/fuzzer_stats"
-echo "  docker exec aflnet-libmodbus cat /opt/fuzzing/results/aflnet-out-libmodbus-${RUN_NUMBER}/fuzzer_stats"
-echo "  docker exec chatafl-libmodbus cat /opt/fuzzing/results/chatafl-out-libmodbus-${RUN_NUMBER}/fuzzer_stats"
-echo "  docker exec a2-libmodbus cat /opt/fuzzing/results/a2-out-libmodbus-${RUN_NUMBER}/fuzzer_stats"
+echo "  docker exec afl-ics-libmodbus cat /opt/fuzzing/results/libmodbus-afl-ics-${RUN_NUMBER}/fuzzer_stats"
+echo "  docker exec aflnet-libmodbus cat /opt/fuzzing/results/libmodbus-aflnet-${RUN_NUMBER}/fuzzer_stats"
+echo "  docker exec chatafl-libmodbus cat /opt/fuzzing/results/libmodbus-chatafl-${RUN_NUMBER}/fuzzer_stats"
+echo "  docker exec a2-libmodbus cat /opt/fuzzing/results/libmodbus-a2-${RUN_NUMBER}/fuzzer_stats"
 
 echo ""
 echo "查看容器日志："
