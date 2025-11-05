@@ -65,3 +65,6 @@ htmlcov/
 
 # mypy
 .mypy_cache/
+
+# Submodule - libmodbus (ignore local changes)
+libmodbus/
