@@ -8,7 +8,6 @@ services:
     container_name: afl-ics-libmodbus
     restart: unless-stopped
     environment:
-      - HTTPS_PROXY=${HTTPS_PROXY}
       - LLM_API_KEY=${LLM_API_KEY}
       - RUN_NUM=${RUN_NUM}
     volumes:
@@ -25,7 +24,6 @@ services:
     container_name: aflnet-libmodbus
     restart: unless-stopped
     environment:
-      - HTTPS_PROXY=${HTTPS_PROXY}
       - LLM_API_KEY=${LLM_API_KEY}
       - RUN_NUM=${RUN_NUM}
     volumes:
@@ -40,7 +38,6 @@ services:
     container_name: chatafl-libmodbus
     restart: unless-stopped
     environment:
-      - HTTPS_PROXY=${HTTPS_PROXY}
       - LLM_API_KEY=${LLM_API_KEY}
       - RUN_NUM=${RUN_NUM}
     volumes:
@@ -55,7 +52,6 @@ services:
     container_name: a2-libmodbus
     restart: unless-stopped
     environment:
-      - HTTPS_PROXY=${HTTPS_PROXY}
       - LLM_API_KEY=${LLM_API_KEY}
       - RUN_NUM=${RUN_NUM}
     volumes:
