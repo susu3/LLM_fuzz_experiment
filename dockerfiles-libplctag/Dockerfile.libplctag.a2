@@ -1,0 +1,99 @@
+FROM ubuntu:20.04
+
+# Avoid interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Update package lists
+RUN apt-get update
+
+# Install build tools
+RUN apt-get install -y --fix-missing \
+    build-essential \
+    git \
+    wget \
+    cmake \
+    autoconf \
+    libtool \
+    pkg-config \
+    make \
+    automake \
+    gcc \
+    g++
+
+# Install Python and other dependencies
+RUN apt-get install -y --fix-missing \
+    python3 \
+    python3-pip \
+    patch \
+    vim \
+    graphviz-dev \
+    libcap-dev \
+    tmux \
+    tcpdump \
+    watch \
+    net-tools \
+    iputils-ping \
+    iproute2 \
+    procps \
+    libcurl4-openssl-dev \
+    libjson-c-dev \
+    libpcre2-dev
+
+# Install LLVM and Clang
+RUN apt-get install -y --fix-missing \
+    clang \
+    llvm \
+    llvm-10 \
+    llvm-10-tools \
+    llvm-10-runtime
+
+# Set working directory
+WORKDIR /opt/fuzzing
+
+# 克隆并编译A2工具
+RUN git clone https://github.com/susu3/A2.git A2 && \
+    cd A2 && \
+    make clean all && \
+    cd llvm_mode && make
+
+# 设置PATH和环境变量
+ENV PATH="/opt/fuzzing/A2:$PATH"
+ENV CC="/opt/fuzzing/A2/afl-clang-fast"
+ENV CXX="/opt/fuzzing/A2/afl-clang-fast++"
+
+# 从 GitHub 克隆 libplctag 源代码并编译
+RUN git clone https://github.com/libplctag/libplctag.git libplctag && \
+    cd libplctag && \
+    mkdir -p build && cd build && \
+    cmake -DCMAKE_C_COMPILER=/opt/fuzzing/A2/afl-clang-fast \
+          -DCMAKE_CXX_COMPILER=/opt/fuzzing/A2/afl-clang-fast++ \
+          -DCMAKE_BUILD_TYPE=MinSizeRel \
+          -DBUILD_TESTS=1 \
+          .. && \
+    make -j$(nproc)
+
+# 创建输出目录
+RUN mkdir -p /opt/fuzzing/results
+
+# 设置用户和权限
+RUN useradd -m -s /bin/bash fuzzer && \
+    chown -R fuzzer:fuzzer /opt/fuzzing
+USER fuzzer
+
+# 创建启动脚本支持次数参数
+RUN echo '#!/bin/bash\n\
+RUN_NUM=${RUN_NUM:-1}\n\
+OUTPUT_DIR="/opt/fuzzing/results/libplctag-a2-${RUN_NUM}"\n\
+echo "Starting A2 fuzzing for libplctag run #${RUN_NUM}"\n\
+echo "Output directory: ${OUTPUT_DIR}"\n\
+cd /opt/fuzzing/libplctag/build/bin_dist && \\\n\
+afl-fuzz -d -i /opt/fuzzing/A2/tutorials/libmodbus/in-modbus \\\n\
+  -o "${OUTPUT_DIR}" \\\n\
+  -N tcp://127.0.0.1/5502 -P MODBUS \\\n\
+  -r /opt/fuzzing/A2/sample_specs/Markdown/modbus.md \\\n\
+  -D 10000 -q 3 -s 3 -E -K -R ./modbus_server --listen 127.0.0.1:5502' > /opt/fuzzing/start_fuzzing.sh && \
+    chmod +x /opt/fuzzing/start_fuzzing.sh
+
+# 启动模糊测试
+CMD ["/opt/fuzzing/start_fuzzing.sh"]
+

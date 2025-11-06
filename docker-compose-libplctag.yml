@@ -1,0 +1,65 @@
+services:
+  afl-ics-libplctag:
+    build:
+      context: .
+      dockerfile: dockerfiles-libplctag/Dockerfile.libplctag.afl-ics
+      ssh:
+        - default
+    container_name: afl-ics-libplctag
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-libplctag
+
+  aflnet-libplctag:
+    build:
+      context: .
+      dockerfile: dockerfiles-libplctag/Dockerfile.libplctag.aflnet
+      ssh:
+        - default
+    container_name: aflnet-libplctag
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-libplctag
+
+  chatafl-libplctag:
+    build:
+      context: .
+      dockerfile: dockerfiles-libplctag/Dockerfile.libplctag.chatafl
+    container_name: chatafl-libplctag
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-libplctag
+
+  a2-libplctag:
+    build:
+      context: .
+      dockerfile: dockerfiles-libplctag/Dockerfile.libplctag.a2
+    container_name: a2-libplctag
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-libplctag
+
+networks:
+  fuzzing-network-libplctag:
+    driver: bridge
+

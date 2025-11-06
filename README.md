@@ -30,13 +30,7 @@ LLM_fuzz_experiment/
 
 ```bash
 # 设置必要的环境变量
-export HTTPS_PROXY=your-proxy-server:port
 export LLM_API_KEY=your-api-key-here
-
-# 或者使用配置文件
-cp env.example .env
-vim .env  # 编辑设置真实值
-```
 
 ### 2. 启动所有容器并自动开始模糊测试
 
@@ -92,15 +86,15 @@ docker exec -it a2-libmodbus /bin/bash
 # 停止所有容器
 ./scripts/stop_all.sh
 
-# 拷贝第1次实验结果
-./scripts/copy_results.sh 1
+# # 拷贝第1次实验结果
+# ./scripts/copy_results.sh 1
 
-# 拷贝第2次实验结果
-./scripts/copy_results.sh 2
+# # 拷贝第2次实验结果
+# ./scripts/copy_results.sh 2
 
-# 拷贝第3次实验结果
-./scripts/copy_results.sh 3
-```
+# # 拷贝第3次实验结果
+# ./scripts/copy_results.sh 3
+# ```
 
 ## 🔄 多次实验对比
 
