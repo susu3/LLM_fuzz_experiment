@@ -67,4 +67,7 @@ htmlcov/
 # mypy
 .mypy_cache/
 
+# test target
+libplctag/
+
 
