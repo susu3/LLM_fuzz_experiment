@@ -59,6 +59,20 @@ services:
     networks:
       - fuzzing-network
 
+  a3-libmodbus:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.libmodbus.a3
+    container_name: a3-libmodbus
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network
+
 networks:
   fuzzing-network:
     driver: bridge

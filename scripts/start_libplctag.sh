@@ -42,6 +42,7 @@ echo "  docker exec afl-ics-libplctag cat /opt/fuzzing/results/libplctag-afl-ics
 echo "  docker exec aflnet-libplctag cat /opt/fuzzing/results/libplctag-aflnet-${RUN_NUMBER}/fuzzer_stats"
 echo "  docker exec chatafl-libplctag cat /opt/fuzzing/results/libplctag-chatafl-${RUN_NUMBER}/fuzzer_stats"
 echo "  docker exec a2-libplctag cat /opt/fuzzing/results/libplctag-a2-${RUN_NUMBER}/fuzzer_stats"
+echo "  docker exec a3-libplctag cat /opt/fuzzing/results/libplctag-a3-${RUN_NUMBER}/fuzzer_stats"
 
 echo ""
 echo "查看容器日志："
@@ -49,6 +50,7 @@ echo "  docker compose -f docker-compose-libplctag.yml logs -f afl-ics-libplctag
 echo "  docker compose -f docker-compose-libplctag.yml logs -f aflnet-libplctag"
 echo "  docker compose -f docker-compose-libplctag.yml logs -f chatafl-libplctag"
 echo "  docker compose -f docker-compose-libplctag.yml logs -f a2-libplctag"
+echo "  docker compose -f docker-compose-libplctag.yml logs -f a3-libplctag"
 
 echo ""
 echo "进入容器（可选）："
@@ -56,6 +58,7 @@ echo "  docker exec -it afl-ics-libplctag /bin/bash"
 echo "  docker exec -it aflnet-libplctag /bin/bash"
 echo "  docker exec -it chatafl-libplctag /bin/bash"
 echo "  docker exec -it a2-libplctag /bin/bash"
+echo "  docker exec -it a3-libplctag /bin/bash"
 
 echo ""
 echo "停止所有容器："

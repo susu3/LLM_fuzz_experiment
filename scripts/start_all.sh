@@ -42,6 +42,7 @@ echo "  docker exec afl-ics-libmodbus cat /opt/fuzzing/results/libmodbus-afl-ics
 echo "  docker exec aflnet-libmodbus cat /opt/fuzzing/results/libmodbus-aflnet-${RUN_NUMBER}/fuzzer_stats"
 echo "  docker exec chatafl-libmodbus cat /opt/fuzzing/results/libmodbus-chatafl-${RUN_NUMBER}/fuzzer_stats"
 echo "  docker exec a2-libmodbus cat /opt/fuzzing/results/libmodbus-a2-${RUN_NUMBER}/fuzzer_stats"
+echo "  docker exec a3-libmodbus cat /opt/fuzzing/results/libmodbus-a3-${RUN_NUMBER}/fuzzer_stats"
 
 echo ""
 echo "查看容器日志："
@@ -49,6 +50,7 @@ echo "  docker compose logs -f afl-ics-libmodbus"
 echo "  docker compose logs -f aflnet-libmodbus"
 echo "  docker compose logs -f chatafl-libmodbus"
 echo "  docker compose logs -f a2-libmodbus"
+echo "  docker compose logs -f a3-libmodbus"
 
 echo ""
 echo "进入容器（可选）："
@@ -56,6 +58,7 @@ echo "  docker exec -it afl-ics-libmodbus /bin/bash"
 echo "  docker exec -it aflnet-libmodbus /bin/bash"
 echo "  docker exec -it chatafl-libmodbus /bin/bash"
 echo "  docker exec -it a2-libmodbus /bin/bash"
+echo "  docker exec -it a3-libmodbus /bin/bash"
 
 echo ""
 echo "停止所有容器："

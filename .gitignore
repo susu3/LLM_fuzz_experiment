@@ -52,6 +52,7 @@ temp/
 data/
 results/
 *results*/
+coverage-reports/
 experiments/
 models/
 checkpoints/

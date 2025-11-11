@@ -49,9 +49,9 @@ RUN apt-get install -y --fix-missing \
 # Set working directory
 WORKDIR /opt/fuzzing
 
-# 克隆并编译A2工具
-RUN git clone https://github.com/susu3/A2.git A2 && \
-    cd A2 && \
+# 克隆并编译A3工具
+RUN git clone https://github.com/susu3/A3.git A3 && \
+    cd A3 && \
     make clean all && \
     cd llvm_mode && make
 
@@ -59,7 +59,7 @@ RUN git clone https://github.com/susu3/A2.git A2 && \
 COPY ./libmodbus /opt/fuzzing/libmodbus
 
 # 设置PATH
-ENV PATH="/opt/fuzzing/A2:$PATH"
+ENV PATH="/opt/fuzzing/A3:$PATH"
 
 # 创建输出目录
 RUN mkdir -p /opt/fuzzing/results
@@ -72,15 +72,17 @@ USER fuzzer
 # 创建启动脚本支持次数参数
 RUN echo '#!/bin/bash\n\
 RUN_NUM=${RUN_NUM:-1}\n\
-OUTPUT_DIR="/opt/fuzzing/results/libmodbus-a2-${RUN_NUM}"\n\
-echo "Starting A2 fuzzing run #${RUN_NUM}"\n\
+OUTPUT_DIR="/opt/fuzzing/results/libmodbus-a3-${RUN_NUM}"\n\
+echo "Starting A3 fuzzing run #${RUN_NUM}"\n\
 echo "Output directory: ${OUTPUT_DIR}"\n\
 cd /opt/fuzzing/libmodbus/tests && \\\n\
-afl-fuzz -d -i /opt/fuzzing/A2/tutorials/libmodbus/in-modbus \\\n\
+afl-fuzz -d -i /opt/fuzzing/A3/tutorials/libmodbus/in-modbus \\\n\
   -o "${OUTPUT_DIR}" \\\n\
   -N tcp://127.0.0.1/1502 -P MODBUS \\\n\
+  -r /opt/fuzzing/A3/sample_specs/Markdown/modbus.txt \\\n\
   -D 10000 -q 3 -s 3 -E -K -R ./server 1502' > /opt/fuzzing/start_fuzzing.sh && \
     chmod +x /opt/fuzzing/start_fuzzing.sh
 
-# 启动模糊测试（A2使用自己的输入文件和规范文件）
+# 启动模糊测试（A3使用自己的输入文件和规范文件）
 CMD ["/opt/fuzzing/start_fuzzing.sh"]
+

@@ -59,6 +59,20 @@ services:
     networks:
       - fuzzing-network-libplctag
 
+  a3-libplctag:
+    build:
+      context: .
+      dockerfile: dockerfiles-libplctag/Dockerfile.libplctag.a3
+    container_name: a3-libplctag
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-libplctag
+
 networks:
   fuzzing-network-libplctag:
     driver: bridge

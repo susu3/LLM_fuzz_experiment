@@ -10,8 +10,8 @@ echo "拷贝 libplctag 第 $RUN_NUMBER 次实验的结果..."
 echo "创建输出目录: $OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"
 
-CONTAINERS=("afl-ics-libplctag" "aflnet-libplctag" "chatafl-libplctag" "a2-libplctag")
-TOOLS=("afl-ics" "aflnet" "chatafl" "a2")
+CONTAINERS=("afl-ics-libplctag" "aflnet-libplctag" "chatafl-libplctag" "a2-libplctag" "a3-libplctag")
+TOOLS=("afl-ics" "aflnet" "chatafl" "a2" "a3")
 
 for i in "${!CONTAINERS[@]}"; do
     container="${CONTAINERS[$i]}"

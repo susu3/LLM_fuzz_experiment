@@ -15,12 +15,14 @@ AFLNET_REPLAY="/home/ecs-user/AFL-ICS/aflnet-replay"  # 使用绝对路径
 TARGET="MODBUS"  # 协议名称
 TARGET_PORT="1502"  # 默认端口
 
-# 根据目标程序调整路径
+# 根据目标程序调整路径（使用绝对路径）
+BASE_DIR="/home/ecs-user/LLM_fuzz_experiment"
+
 if [ "$TARGET_IMPL" = "libplctag" ]; then
-    INPUT_DIR="../results/libplctag-${FUZZER}-${RUN_NUM}/replayable-queue"
+    INPUT_DIR="$BASE_DIR/results/libplctag-${FUZZER}-${RUN_NUM}/replayable-queue"
     TARGET_PORT="5502"  # libplctag 使用 5502
 else
-    INPUT_DIR="../results/libmodbus-${FUZZER}-${RUN_NUM}/replayable-queue"
+    INPUT_DIR="$BASE_DIR/results/libmodbus-${FUZZER}-${RUN_NUM}/replayable-queue"
     TARGET_PORT="1502"  # libmodbus 使用 1502
 fi
 

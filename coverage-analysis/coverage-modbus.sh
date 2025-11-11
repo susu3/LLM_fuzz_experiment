@@ -11,28 +11,30 @@ set -e
 
 # 参数解析（可选，默认为 libmodbus）
 TARGET_IMPL="${1:-libmodbus}"  # libmodbus 或 libplctag
-FUZZER="${2:-aflnet}"          # afl-ics, aflnet, chatafl, a2
+FUZZER="${2:-aflnet}"          # afl-ics, aflnet, chatafl, a2, a3
 RUN_NUM="${3:-1}"              # 实验次数
 
-# Configuration - 根据目标调整
+# Configuration - 根据目标调整（使用绝对路径）
+BASE_DIR="/home/ecs-user/LLM_fuzz_experiment"
+
 if [ "$TARGET_IMPL" = "libplctag" ]; then
-    MODBUS_DIR="../libplctag"
-    OUTPUT_DIR="../results/libplctag-${FUZZER}-${RUN_NUM}"
-    COVERAGE_DIR="../coverage-reports/libplctag-${FUZZER}-${RUN_NUM}"
-    REPLAY_SCRIPT="$(dirname $0)/replay-modbus.sh"
+    MODBUS_DIR="$BASE_DIR/libplctag"
+    OUTPUT_DIR="$BASE_DIR/results/libplctag-${FUZZER}-${RUN_NUM}"
+    COVERAGE_DIR="$BASE_DIR/coverage-reports"
+    REPLAY_SCRIPT="$BASE_DIR/coverage-analysis/replay-modbus.sh"
     SERVER_PORT="5502"
     BUILD_TYPE="cmake"
 else
-    MODBUS_DIR="../libmodbus"
-    OUTPUT_DIR="../results/libmodbus-${FUZZER}-${RUN_NUM}"
-    COVERAGE_DIR="../coverage-reports/libmodbus-${FUZZER}-${RUN_NUM}"
-    REPLAY_SCRIPT="$(dirname $0)/replay-modbus.sh"
+    MODBUS_DIR="$BASE_DIR/libmodbus"
+    OUTPUT_DIR="$BASE_DIR/results/libmodbus-${FUZZER}-${RUN_NUM}"
+    COVERAGE_DIR="$BASE_DIR/coverage-reports"
+    REPLAY_SCRIPT="$BASE_DIR/coverage-analysis/replay-modbus.sh"
     SERVER_PORT="1502"
     BUILD_TYPE="autotools"
 fi
 
 SERVER_CHECK_INTERVAL=5  # Check server status every 5 seconds
-MAX_SERVER_RESTART_ATTEMPTS=3
+MAX_SERVER_RESTART_ATTEMPTS=100  # 增加重启次数限制（从3改为100）
 
 # Colors for output
 RED='\033[0;31m'
@@ -105,7 +107,13 @@ rebuild_with_coverage() {
     if [ "$BUILD_TYPE" = "cmake" ]; then
         # libplctag 使用 CMake
         print_status "Using CMake build system..."
+        
+        # 彻底清理之前的覆盖率数据
+        print_status "Cleaning previous coverage data..."
         rm -rf build-coverage
+        find . -name "*.gcda" -delete 2>/dev/null || true
+        find . -name "*.gcno" -delete 2>/dev/null || true
+        
         mkdir -p build-coverage
         cd build-coverage
         
@@ -122,7 +130,12 @@ rebuild_with_coverage() {
     else
         # libmodbus 使用 autotools
         print_status "Using autotools build system..."
+        
+        # 彻底清理之前的覆盖率数据
+        print_status "Cleaning previous coverage data..."
         make clean || true
+        find . -name "*.gcda" -delete 2>/dev/null || true
+        find . -name "*.gcno" -delete 2>/dev/null || true
         
         # Ensure coverage flags are used
         print_status "Configuring with coverage flags: $CFLAGS"
@@ -229,10 +242,11 @@ is_coverage_server_running() {
 start_coverage_server() {
     print_status "Starting coverage-enabled modbus server with monitoring..."
     
-    # Kill any existing servers
-    pkill -f "server" || true
-    pkill -f "server-coverage" || true
-    pkill -f "modbus_server" || true
+    # Kill any existing servers (使用精确匹配，避免杀死其他进程)
+    pkill -f "server-coverage $SERVER_PORT" || true
+    pkill -f "modbus_server --listen.*$SERVER_PORT" || true
+    pkill -f "\./server-coverage" || true
+    pkill -f "\./modbus_server" || true
     sleep 2
     
     # Start the coverage-enabled server
@@ -289,6 +303,13 @@ monitor_coverage_server() {
             if [ $SERVER_RESTART_COUNT -le $MAX_SERVER_RESTART_ATTEMPTS ]; then
                 print_status "Restart attempt $SERVER_RESTART_COUNT of $MAX_SERVER_RESTART_ATTEMPTS"
                 
+                # 强制清理可能残留的服务器进程
+                pkill -9 -f "server-coverage $SERVER_PORT" 2>/dev/null || true
+                pkill -9 -f "modbus_server --listen.*$SERVER_PORT" 2>/dev/null || true
+                
+                # 等待端口释放
+                sleep 2
+                
                 cd "$MODBUS_DIR"
                 if [ "$BUILD_TYPE" = "cmake" ]; then
                     cd build-coverage/bin_dist
@@ -298,12 +319,16 @@ monitor_coverage_server() {
                     ./server-coverage $SERVER_PORT &
                 fi
                 SERVER_PID=$!
-                sleep 5
+                
+                # 等待服务器启动（增加等待时间）
+                sleep 3
                 
                 if is_coverage_server_running; then
                     print_status "Coverage server restarted successfully with PID: $SERVER_PID"
                 else
                     print_error "Failed to restart coverage server (attempt $SERVER_RESTART_COUNT)"
+                    # 显示可能的错误信息
+                    print_error "Port $SERVER_PORT may still be in use or server binary has issues"
                 fi
             else
                 print_error "Maximum restart attempts ($MAX_SERVER_RESTART_ATTEMPTS) reached. Stopping monitoring."
@@ -384,150 +409,171 @@ generate_coverage_reports() {
     # Create coverage reports directory
     mkdir -p "$COVERAGE_DIR"
     
-    # Find coverage data files starting from libmodbus directory
+    # Find coverage data files - 路径根据构建类型不同
     cd "$MODBUS_DIR"
     
-    # Find .gcno files (compile-time) and .gcda files (runtime) for coverage analysis
-    # Check in src directory first (where they should be)
-    GCNO_FILES=$(find "$MODBUS_DIR/src" -name "*.gcno" 2>/dev/null | wc -l)
-    GCDA_FILES=$(find "$MODBUS_DIR/src" -name "*.gcda" 2>/dev/null | wc -l)
-    
-    print_status "Found $GCNO_FILES .gcno files in src directory (compile-time coverage data)"
-    print_status "Found $GCDA_FILES .gcda files in src directory (runtime coverage data)"
-    
-    if [ "$GCNO_FILES" -eq 0 ]; then
-        print_warning "No .gcno files found in src directory."
-        print_status "Checking other directories..."
+    if [ "$BUILD_TYPE" = "cmake" ]; then
+        # CMake 构建：覆盖率文件在 build-coverage 中
+        print_status "Searching for coverage files in CMake build directory..."
+        GCNO_FILES=$(find "$MODBUS_DIR/build-coverage" -name "*.gcno" 2>/dev/null | wc -l)
+        GCDA_FILES=$(find "$MODBUS_DIR/build-coverage" -name "*.gcda" 2>/dev/null | wc -l)
         
-        # Check tests directory
-        GCNO_FILES_TESTS=$(find "$MODBUS_DIR/tests" -name "*.gcno" 2>/dev/null | wc -l)
-        GCDA_FILES_TESTS=$(find "$MODBUS_DIR/tests" -name "*.gcda" 2>/dev/null | wc -l)
-        print_status "In tests directory: $GCNO_FILES_TESTS .gcno files, $GCDA_FILES_TESTS .gcda files"
+        print_status "Found $GCNO_FILES .gcno files in build-coverage (compile-time coverage data)"
+        print_status "Found $GCDA_FILES .gcda files in build-coverage (runtime coverage data)"
         
-        # Check entire libmodbus directory
-        GCNO_FILES_ALL=$(find "$MODBUS_DIR" -name "*.gcno" 2>/dev/null | wc -l)
-        print_status "Total in libmodbus: $GCNO_FILES_ALL .gcno files"
-        
-        if [ "$GCNO_FILES_ALL" -eq 0 ]; then
-            print_error "No .gcno files found anywhere. Coverage instrumentation was not successful during compilation."
+        if [ "$GCNO_FILES" -eq 0 ]; then
+            print_error "No .gcno files found in build-coverage. Coverage instrumentation failed."
             return 1
         fi
         
-        if [ "$GCNO_FILES_TESTS" -gt 0 ]; then
-            print_status "Found coverage data in tests directory, will use that"
-            cd "$MODBUS_DIR/tests"
-        fi
+        # 设置 gcovr 的根目录和对象目录
+        GCOVR_ROOT="$MODBUS_DIR"
+        GCOVR_OBJECT_DIR="$MODBUS_DIR/build-coverage"
     else
-        print_status "Found compile-time coverage data in src directory (correct location)"
+        # autotools 构建：覆盖率文件在 src 中
+        print_status "Searching for coverage files in src directory..."
+        GCNO_FILES=$(find "$MODBUS_DIR/src" -name "*.gcno" 2>/dev/null | wc -l)
+        GCDA_FILES=$(find "$MODBUS_DIR/src" -name "*.gcda" 2>/dev/null | wc -l)
+        
+        print_status "Found $GCNO_FILES .gcno files in src directory (compile-time coverage data)"
+        print_status "Found $GCDA_FILES .gcda files in src directory (runtime coverage data)"
+        
+        if [ "$GCNO_FILES" -eq 0 ]; then
+            print_warning "No .gcno files found in src directory."
+            # Check tests directory
+            GCNO_FILES_TESTS=$(find "$MODBUS_DIR/tests" -name "*.gcno" 2>/dev/null | wc -l)
+            if [ "$GCNO_FILES_TESTS" -gt 0 ]; then
+                print_status "Found coverage data in tests directory"
+                cd "$MODBUS_DIR/tests"
+            fi
+        fi
+        
+        # 设置 gcovr 的根目录和对象目录
+        GCOVR_ROOT="$MODBUS_DIR"
+        GCOVR_OBJECT_DIR="$MODBUS_DIR/src"
     fi
     
     if [ "$GCDA_FILES" -eq 0 ]; then
-        print_warning "No .gcda files found in src directory. The coverage-enabled server may not have executed or no code was covered."
+        print_warning "No .gcda files found. The coverage-enabled server may not have executed or no code was covered."
         print_status "Coverage reports will show 0% coverage since no runtime data is available."
     fi
     
     print_status "Coverage files summary: $GCNO_FILES .gcno files, $GCDA_FILES .gcda files"
-    
-    # Debug: Show current directory and coverage files
-    CURRENT_DIR=$(pwd)
-    print_status "Current directory: $CURRENT_DIR"
-    print_status "Sample .gcno files (compile-time):"
-    find . -name "*.gcno" | head -3
-    print_status "Sample .gcda files (runtime):"
-    find . -name "*.gcda" | head -3
-    
-    # Debug: Show what gcovr can see
-    print_status "Checking gcovr version and capabilities..."
-    gcovr --version 2>/dev/null || print_warning "Could not get gcovr version"
-    
-    # Set up gcovr to find coverage files in the src directory
-    print_status "Coverage files are located in: $MODBUS_DIR/src"
-    print_status "Setting up gcovr to use libmodbus root with src as object directory"
-    
-    # Always use libmodbus root as the base, and specify src as object directory
-    GCOVR_ROOT="$MODBUS_DIR"
-    GCOVR_OBJECT_DIR="$MODBUS_DIR/src"
-    
     print_status "GCOVR_ROOT: $GCOVR_ROOT"
     print_status "GCOVR_OBJECT_DIR: $GCOVR_OBJECT_DIR"
     
-    # Verify the coverage files exist in src directory
-    SRC_GCNO_COUNT=$(find "$MODBUS_DIR/src" -name "*.gcno" 2>/dev/null | wc -l)
-    SRC_GCDA_COUNT=$(find "$MODBUS_DIR/src" -name "*.gcda" 2>/dev/null | wc -l)
-    print_status "Verified: $SRC_GCNO_COUNT .gcno files in src directory"
-    print_status "Verified: $SRC_GCDA_COUNT .gcda files in src directory"
+    # Generate HTML coverage report (single summary page with branch coverage)
+    # HTML_FILE="$COVERAGE_DIR/coverage-${TARGET_IMPL}-${FUZZER}-${RUN_NUM}.html"
+    # print_status "Generating HTML coverage summary..."
+    # 
+    # # Use the correct root and object directory
+    # if gcovr --root "$GCOVR_ROOT" \
+    #       --object-directory "$GCOVR_OBJECT_DIR" \
+    #       --html --branches \
+    #       -o "$HTML_FILE" \
+    #       --print-summary 2>/dev/null; then
+    #     print_status "HTML report generated successfully: $HTML_FILE"
+    # elif cd "$GCOVR_OBJECT_DIR" && gcovr --root "$GCOVR_ROOT" \
+    #       --html --branches \
+    #       -o "$HTML_FILE" \
+    #       --print-summary 2>/dev/null; then
+    #     print_status "HTML report generated (from object directory)"
+    #     cd "$MODBUS_DIR"
+    # else
+    #     print_error "HTML report generation failed"
+    # fi
+    print_status "HTML report generation skipped (commented out)"
     
-    # Generate HTML coverage report
-    print_status "Generating HTML coverage report..."
+    # Generate line coverage report only (不带 --branches，只显示行覆盖率)
+    LINE_COVERAGE_FILE="$COVERAGE_DIR/coverage-line-${TARGET_IMPL}-${FUZZER}-${RUN_NUM}.txt"
+    print_status "Generating line coverage report (Lines/Exec/Cover only)..."
     
-    # Use the correct root and object directory
     if gcovr --root "$GCOVR_ROOT" \
           --object-directory "$GCOVR_OBJECT_DIR" \
-          --html --html-details -o "$COVERAGE_DIR/coverage.html" \
+          --txt \
+          -o "$LINE_COVERAGE_FILE" \
           --print-summary 2>/dev/null; then
-        print_status "HTML report generated successfully"
-    elif gcovr --root "$GCOVR_ROOT" \
-          --html --html-details -o "$COVERAGE_DIR/coverage.html" \
-          --print-summary 2>/dev/null; then
-        print_status "HTML report generated (without explicit object directory)"
+        print_status "Line coverage report generated: $LINE_COVERAGE_FILE"
     elif cd "$GCOVR_OBJECT_DIR" && gcovr --root "$GCOVR_ROOT" \
-          --html --html-details -o "$COVERAGE_DIR/coverage.html" \
+          --txt \
+          -o "$LINE_COVERAGE_FILE" \
           --print-summary 2>/dev/null; then
-        print_status "HTML report generated (from src directory)"
+        print_status "Line coverage report generated (from object directory)"
         cd "$MODBUS_DIR"
     else
-        print_error "HTML report generation failed"
+        print_error "Line coverage report generation failed"
     fi
     
-    # Generate text summary
-    print_status "Generating text coverage summary..."
+    # Generate branch coverage report only (带 --branches，只显示分支覆盖率)
+    BRANCH_COVERAGE_FILE="$COVERAGE_DIR/coverage-branch-${TARGET_IMPL}-${FUZZER}-${RUN_NUM}.txt"
+    print_status "Generating branch coverage report (Branches/Taken/Cover only)..."
     
-    # Try with verbose output to see what's happening
     if gcovr --root "$GCOVR_ROOT" \
           --object-directory "$GCOVR_OBJECT_DIR" \
-          --txt -o "$COVERAGE_DIR/coverage.txt" \
+          --txt --branches \
+          -o "$BRANCH_COVERAGE_FILE" \
           --print-summary 2>/dev/null; then
-        print_status "Text summary generated successfully"
+        print_status "Branch coverage report generated: $BRANCH_COVERAGE_FILE"
     elif cd "$GCOVR_OBJECT_DIR" && gcovr --root "$GCOVR_ROOT" \
-          --txt -o "$COVERAGE_DIR/coverage.txt" \
+          --txt --branches \
+          -o "$BRANCH_COVERAGE_FILE" \
           --print-summary 2>/dev/null; then
-        print_status "Text summary generated (from src directory)"
+        print_status "Branch coverage report generated (from object directory)"
         cd "$MODBUS_DIR"
     else
-        print_error "Text summary generation failed"
+        print_error "Branch coverage report generation failed"
     fi
     
     # Generate detailed text report
-    print_status "Generating detailed text coverage report..."
-    if gcovr --root "$GCOVR_ROOT" \
-          --object-directory "$GCOVR_OBJECT_DIR" \
-          --txt --show-branch -o "$COVERAGE_DIR/coverage-detailed.txt" 2>/dev/null; then
-        print_status "Detailed text report generated successfully"
-    elif cd "$GCOVR_OBJECT_DIR" && gcovr --root "$GCOVR_ROOT" \
-          --txt --show-branch -o "$COVERAGE_DIR/coverage-detailed.txt" 2>/dev/null; then
-        print_status "Detailed text report generated (from src directory)"
-        cd "$MODBUS_DIR"
-    else
-        print_warning "Detailed text report generation failed"
-    fi
+    # print_status "Generating detailed text coverage report..."
+    # if gcovr --root "$GCOVR_ROOT" \
+    #       --object-directory "$GCOVR_OBJECT_DIR" \
+    #       --txt --show-branch -o "$COVERAGE_DIR/coverage-detailed.txt" 2>/dev/null; then
+    #     print_status "Detailed text report generated successfully"
+    # elif cd "$GCOVR_OBJECT_DIR" && gcovr --root "$GCOVR_ROOT" \
+    #       --txt --show-branch -o "$COVERAGE_DIR/coverage-detailed.txt" 2>/dev/null; then
+    #     print_status "Detailed text report generated (from src directory)"
+    #     cd "$MODBUS_DIR"
+    # else
+    #     print_warning "Detailed text report generation failed"
+    # fi
+    print_status "Detailed text report generation skipped (commented out)"
     
     print_status "Coverage reports generated in: $COVERAGE_DIR"
+    
+    # 清理 .gcda 文件，避免影响下次分析
+    print_status "Cleaning .gcda files to prevent contamination of next analysis..."
+    find "$MODBUS_DIR" -name "*.gcda" -delete 2>/dev/null || true
+    print_status ".gcda files cleaned"
 }
 
 # Display coverage summary
 display_summary() {
     print_status "Coverage Analysis Summary:"
     echo "=========================="
+    echo "Target: $TARGET_IMPL | Fuzzer: $FUZZER | Run: #$RUN_NUM"
+    echo ""
     
-    if [ -f "$COVERAGE_DIR/coverage.txt" ]; then
-        cat "$COVERAGE_DIR/coverage.txt"
+    LINE_COVERAGE_FILE="$COVERAGE_DIR/coverage-line-${TARGET_IMPL}-${FUZZER}-${RUN_NUM}.txt"
+    BRANCH_COVERAGE_FILE="$COVERAGE_DIR/coverage-branch-${TARGET_IMPL}-${FUZZER}-${RUN_NUM}.txt"
+    
+    if [ -f "$LINE_COVERAGE_FILE" ]; then
+        echo "=== Line Coverage ==="
+        tail -5 "$LINE_COVERAGE_FILE"
+        echo ""
+    fi
+    
+    if [ -f "$BRANCH_COVERAGE_FILE" ]; then
+        echo "=== Branch Coverage ==="
+        tail -5 "$BRANCH_COVERAGE_FILE"
+        echo ""
     fi
     
     echo ""
     print_status "Available reports:"
-    echo "  - HTML Report: $COVERAGE_DIR/coverage.html"
-    echo "  - Text Summary: $COVERAGE_DIR/coverage.txt"
-    echo "  - Detailed Report: $COVERAGE_DIR/coverage-detailed.txt"
+    echo "  - Line Coverage:   $LINE_COVERAGE_FILE"
+    echo "  - Branch Coverage: $BRANCH_COVERAGE_FILE"
+    # echo "  - HTML Report:     $HTML_FILE (commented out)"
     
     echo ""
     print_status "Server monitoring statistics:"
@@ -547,9 +593,11 @@ cleanup() {
         kill $SERVER_PID 2>/dev/null || true
     fi
     
-    # Kill any remaining server processes
-    pkill -f "server" || true
-    pkill -f "server-coverage" || true
+    # Kill any remaining server processes (使用更精确的匹配，避免杀死 SSH 等进程)
+    pkill -f "server-coverage $SERVER_PORT" || true
+    pkill -f "modbus_server --listen" || true
+    pkill -f "\./server-coverage" || true
+    pkill -f "\./modbus_server" || true
     
     # Kill monitor process if still running
     if [ ! -z "$MONITOR_PID" ]; then
@@ -629,7 +677,7 @@ case "${1:-}" in
         ;;
     --monitor-only)
         check_prerequisites
-        if [ ! -f "$MODBUS_DIR/tests/server-coverage" ]; then
+        if [ ! -f "$MODBUS_DIR/tests/server-coverage" ] && [ ! -f "$MODBUS_DIR/build-coverage/bin_dist/modbus_server" ]; then
             print_error "Coverage server binary not found. Run '$0 --rebuild-only' first."
             exit 1
         fi
@@ -639,11 +687,19 @@ case "${1:-}" in
         exit 0
         ;;
     "")
+        # 没有参数，使用默认值运行
         main
         ;;
     *)
-        print_error "Unknown option: $1"
-        echo "Use '$0 --help' for usage information"
-        exit 1
+        # 第一个参数不是选项，当作目标参数处理
+        if [[ ! "$1" =~ ^-- ]]; then
+            # 正常参数，运行主程序
+            main
+        else
+            # 未知的选项
+            print_error "Unknown option: $1"
+            echo "Use '$0 --help' for usage information"
+            exit 1
+        fi
         ;;
 esac 
