@@ -59,8 +59,14 @@ RUN git clone https://github.com/susu3/ChatAFL.git chatafl && \
 
 # 设置PATH和环境变量
 ENV PATH="/opt/fuzzing/chatafl/ChatAFL:$PATH"
+
+# 启用ASAN支持
+ENV AFL_USE_ASAN=1
 ENV CC="/opt/fuzzing/chatafl/ChatAFL/afl-clang-fast"
 ENV CXX="/opt/fuzzing/chatafl/ChatAFL/afl-clang-fast++"
+ENV CFLAGS="-fsanitize=address -fno-omit-frame-pointer -g"
+ENV CXXFLAGS="-fsanitize=address -fno-omit-frame-pointer -g"
+ENV LDFLAGS="-fsanitize=address"
 
 # 从 GitHub 克隆 libplctag 源代码并编译
 RUN git clone https://github.com/libplctag/libplctag.git libplctag && \
@@ -68,6 +74,9 @@ RUN git clone https://github.com/libplctag/libplctag.git libplctag && \
     mkdir -p build && cd build && \
     cmake -DCMAKE_C_COMPILER=/opt/fuzzing/chatafl/ChatAFL/afl-clang-fast \
           -DCMAKE_CXX_COMPILER=/opt/fuzzing/chatafl/ChatAFL/afl-clang-fast++ \
+          -DCMAKE_C_FLAGS="$CFLAGS" \
+          -DCMAKE_CXX_FLAGS="$CXXFLAGS" \
+          -DCMAKE_EXE_LINKER_FLAGS="$LDFLAGS" \
           -DCMAKE_BUILD_TYPE=MinSizeRel \
           -DBUILD_TESTS=1 \
           .. && \
@@ -87,8 +96,10 @@ RUN_NUM=${RUN_NUM:-1}\n\
 OUTPUT_DIR="/opt/fuzzing/results/libplctag-chatafl-${RUN_NUM}"\n\
 echo "Starting ChatAFL fuzzing for libplctag run #${RUN_NUM}"\n\
 echo "Output directory: ${OUTPUT_DIR}"\n\
+# ASAN运行时配置（与AFL配合使用）\n\
+export ASAN_OPTIONS="abort_on_error=1:detect_leaks=0:symbolize=0:allocator_may_return_null=1"\n\
 cd /opt/fuzzing/libplctag/build/bin_dist && \\\n\
-afl-fuzz -d -i /opt/fuzzing/chatafl/ChatAFL/tutorials/libmodbus/in-modbus \\\n\
+afl-fuzz -d -m none -i /opt/fuzzing/chatafl/ChatAFL/tutorials/libmodbus/in-modbus \\\n\
   -o "${OUTPUT_DIR}" \\\n\
   -N tcp://127.0.0.1/5502 -P MODBUS \\\n\
   -D 10000 -q 3 -s 3 -E -K -R ./modbus_server --listen 127.0.0.1:5502' > /opt/fuzzing/start_fuzzing.sh && \

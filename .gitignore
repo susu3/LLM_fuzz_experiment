@@ -70,5 +70,6 @@ htmlcov/
 
 # test target
 libplctag/
+libmodbus/
 
 
