@@ -55,8 +55,31 @@ RUN git clone https://github.com/susu3/A3.git A3 && \
     make clean all && \
     cd llvm_mode && make
 
-# 直接复制libmodbus目标程序（无需编译）
-COPY ./libmodbus /opt/fuzzing/libmodbus
+# 从GitHub克隆libmodbus源码
+RUN git clone https://github.com/stephane/libmodbus.git libmodbus
+
+# 编译libmodbus，启用ASAN和AFL插桩
+# AFL_USE_ASAN=1 让AFL自动处理ASAN兼容性
+ENV AFL_USE_ASAN=1
+ENV CC="/opt/fuzzing/A3/afl-clang-fast"
+ENV CXX="/opt/fuzzing/A3/afl-clang-fast++"
+ENV CFLAGS="-fsanitize=address -fno-omit-frame-pointer -g"
+ENV CXXFLAGS="-fsanitize=address -fno-omit-frame-pointer -g"
+ENV LDFLAGS="-fsanitize=address"
+
+# 编译libmodbus（显式传递编译器和ASAN标志给configure）
+RUN cd /opt/fuzzing/libmodbus && \
+    git checkout 5c14f13 && \
+    patch -p1 < /opt/fuzzing/A3/tutorials/libmodbus/fuzzing.patch && \
+    ./autogen.sh && \
+    CC="$CC" CXX="$CXX" CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS" \
+    ./configure --enable-static --disable-shared && \
+    make clean all
+
+# 编译测试服务器程序（修正头文件路径和链接顺序）
+RUN cd /opt/fuzzing/libmodbus/tests && \
+    $CC $CFLAGS -I../src -I.. -c random-test-server.c -o random-test-server.o && \
+    $CC $CFLAGS $LDFLAGS random-test-server.o ../src/.libs/libmodbus.a -lpthread -o server
 
 # 设置PATH
 ENV PATH="/opt/fuzzing/A3:$PATH"
@@ -75,8 +98,10 @@ RUN_NUM=${RUN_NUM:-1}\n\
 OUTPUT_DIR="/opt/fuzzing/results/libmodbus-a3-${RUN_NUM}"\n\
 echo "Starting A3 fuzzing run #${RUN_NUM}"\n\
 echo "Output directory: ${OUTPUT_DIR}"\n\
+# ASAN运行时配置（与AFL配合使用）\n\
+export ASAN_OPTIONS="abort_on_error=1:detect_leaks=0:symbolize=0:allocator_may_return_null=1"\n\
 cd /opt/fuzzing/libmodbus/tests && \\\n\
-afl-fuzz -d -i /opt/fuzzing/A3/tutorials/libmodbus/in-modbus \\\n\
+afl-fuzz -d -m none -i /opt/fuzzing/A3/tutorials/libmodbus/in-modbus \\\n\
   -o "${OUTPUT_DIR}" \\\n\
   -N tcp://127.0.0.1/1502 -P MODBUS \\\n\
   -r /opt/fuzzing/A3/sample_specs/Markdown/modbus.txt \\\n\
