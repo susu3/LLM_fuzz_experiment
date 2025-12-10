@@ -1,0 +1,79 @@
+services:
+  afl-ics-iec104:
+    build:
+      context: .
+      dockerfile: dockerfiles-iec104/Dockerfile.iec104.afl-ics
+      ssh:
+        - default
+    container_name: afl-ics-iec104
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network
+
+  aflnet-iec104:
+    build:
+      context: .
+      dockerfile: dockerfiles-iec104/Dockerfile.iec104.aflnet
+      ssh:
+        - default
+    container_name: aflnet-iec104
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network
+
+  chatafl-iec104:
+    build:
+      context: .
+      dockerfile: dockerfiles-iec104/Dockerfile.iec104.chatafl
+    container_name: chatafl-iec104
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network
+
+  a2-iec104:
+    build:
+      context: .
+      dockerfile: dockerfiles-iec104/Dockerfile.iec104.a2
+    container_name: a2-iec104
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network
+
+  a3-iec104:
+    build:
+      context: .
+      dockerfile: dockerfiles-iec104/Dockerfile.iec104.a3
+    container_name: a3-iec104
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network
+
+networks:
+  fuzzing-network:
+    driver: bridge
+

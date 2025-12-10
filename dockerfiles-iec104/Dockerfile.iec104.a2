@@ -1,0 +1,113 @@
+FROM ubuntu:20.04
+
+# Avoid interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Update package lists
+RUN apt-get update
+
+# Install build tools
+RUN apt-get install -y --fix-missing \
+    build-essential \
+    git \
+    wget \
+    autoconf \
+    libtool \
+    pkg-config \
+    make \
+    automake \
+    gcc \
+    g++
+
+# Install Python and other dependencies
+RUN apt-get install -y --fix-missing \
+    python3 \
+    python3-pip \
+    patch \
+    vim \
+    graphviz-dev \
+    libcap-dev \
+    tmux \
+    tcpdump \
+    watch \
+    net-tools \
+    iputils-ping \
+    iproute2 \
+    procps \
+    libcurl4-openssl-dev \
+    libjson-c-dev \
+    libpcre2-dev
+
+# Install LLVM and Clang
+RUN apt-get install -y --fix-missing \
+    clang \
+    llvm \
+    llvm-10 \
+    llvm-10-tools \
+    llvm-10-runtime
+
+# Set working directory
+WORKDIR /opt/fuzzing
+
+# 克隆并编译A2工具
+RUN git clone https://github.com/susu3/A2.git A2 && \
+    cd A2 && \
+    make clean all && \
+    cd llvm_mode && make
+
+# 从GitHub克隆IEC104源码
+RUN git clone https://github.com/airpig2011/IEC104.git IEC104
+
+# 编译IEC104，启用ASAN和AFL插桩
+# AFL_USE_ASAN=1 让AFL自动处理ASAN兼容性
+ENV AFL_USE_ASAN=1
+ENV CC="/opt/fuzzing/A2/afl-clang-fast"
+ENV CXX="/opt/fuzzing/A2/afl-clang-fast++"
+ENV CFLAGS="-fsanitize=address -fno-omit-frame-pointer -g"
+ENV CXXFLAGS="-fsanitize=address -fno-omit-frame-pointer -g"
+ENV LDFLAGS="-fsanitize=address"
+
+# 修改IEC104的Makefile来使用AFL编译器和ASAN
+RUN cd /opt/fuzzing/IEC104/test && \
+    sed -i 's/^CC = gcc/CC = afl-clang-fast/' Makefile && \
+    sed -i 's/^CFLAGS +=-I\$(MODULE_PATH) -lpthread$/CFLAGS +=-I\$(MODULE_PATH) -lpthread\nCFLAGS +=-Wno-return-type -fsanitize=address -g -O0\nLDFLAGS +=-fsanitize=address/' Makefile
+
+# 修改IEC104的main.c，将IP改为127.0.0.1，端口改为10000
+RUN cd /opt/fuzzing/IEC104/test && \
+    sed -i 's|uint8_t \*dstip = "192.168.1.114";|uint8_t *dstip = "127.0.0.1";|' main.c && \
+    sed -i 's/servaddr.sin_port = htons(6666);/servaddr.sin_port = htons(10000);/' main.c
+
+# 编译IEC104
+RUN cd /opt/fuzzing/IEC104/test && \
+    make clean && \
+    make
+
+# 设置PATH
+ENV PATH="/opt/fuzzing/A2:$PATH"
+
+# 创建输出目录
+RUN mkdir -p /opt/fuzzing/results
+
+# 设置用户和权限
+RUN useradd -m -s /bin/bash fuzzer && \
+    chown -R fuzzer:fuzzer /opt/fuzzing
+USER fuzzer
+
+# 创建启动脚本支持次数参数
+RUN echo '#!/bin/bash\n\
+RUN_NUM=${RUN_NUM:-1}\n\
+OUTPUT_DIR="/opt/fuzzing/results/iec104-a2-${RUN_NUM}"\n\
+echo "Starting A2 fuzzing run #${RUN_NUM}"\n\
+echo "Output directory: ${OUTPUT_DIR}"\n\
+# ASAN运行时配置（与AFL配合使用）\n\
+export ASAN_OPTIONS="abort_on_error=1:detect_leaks=0:symbolize=0:allocator_may_return_null=1"\n\
+cd /opt/fuzzing/IEC104/test && \\\n\
+afl-fuzz -d -m none -i /opt/fuzzing/A2/tutorials/iec104/in-iec104 \\\n\
+  -o "${OUTPUT_DIR}" \\\n\
+  -N tcp://127.0.0.1/10000 -P IEC104 \\\n\
+  -W 10000 -q 3 -s 3 -E -K -R ./iec104_monitor 10000' > /opt/fuzzing/start_fuzzing.sh && \
+    chmod +x /opt/fuzzing/start_fuzzing.sh
+
+# 启动模糊测试（A2使用自己的输入文件和规范文件）
+CMD ["/opt/fuzzing/start_fuzzing.sh"]
+
