@@ -70,20 +70,20 @@ ENV CFLAGS="-fsanitize=address -fno-omit-frame-pointer -g"
 ENV CXXFLAGS="-fsanitize=address -fno-omit-frame-pointer -g"
 ENV LDFLAGS="-fsanitize=address"
 
-# 修改IEC104的Makefile来使用AFL编译器和ASAN
+# 修改IEC104的Makefile来添加ASAN标志（不修改CC，使用环境变量）
 RUN cd /opt/fuzzing/IEC104/test && \
-    sed -i 's/^CC = gcc/CC = afl-clang-fast/' Makefile && \
     sed -i 's/^CFLAGS +=-I\$(MODULE_PATH) -lpthread$/CFLAGS +=-I\$(MODULE_PATH) -lpthread\nCFLAGS +=-Wno-return-type -fsanitize=address -g -O0\nLDFLAGS +=-fsanitize=address/' Makefile
 
-# 修改IEC104的main.c，将IP改为127.0.0.1，端口改为10000
+# 复制并应用fuzzing优化补丁（单次运行模式，适合AFL fuzzing）
+COPY dockerfiles-iec104/iec104-fuzzing.patch /tmp/
 RUN cd /opt/fuzzing/IEC104/test && \
-    sed -i 's|uint8_t \*dstip = "192.168.1.114";|uint8_t *dstip = "127.0.0.1";|' main.c && \
-    sed -i 's/servaddr.sin_port = htons(6666);/servaddr.sin_port = htons(10000);/' main.c
+    patch -p2 < /tmp/iec104-fuzzing.patch && \
+    rm /tmp/iec104-fuzzing.patch
 
-# 编译IEC104
+# 编译IEC104（使用环境变量中的CC）
 RUN cd /opt/fuzzing/IEC104/test && \
     make clean && \
-    make
+    make CC="$CC"
 
 # 设置PATH
 ENV PATH="/opt/fuzzing/AFL-ICS:$PATH"
@@ -105,11 +105,11 @@ echo "Output directory: ${OUTPUT_DIR}"\n\
 # ASAN运行时配置（与AFL配合使用）\n\
 export ASAN_OPTIONS="abort_on_error=1:detect_leaks=0:symbolize=0:allocator_may_return_null=1"\n\
 cd /opt/fuzzing/IEC104/test && \\\n\
-afl-fuzz -d -m none -i /opt/fuzzing/AFL-ICS/tutorials/iec104/in-iec104 \\\n\
+afl-fuzz -d -m none -t 5000+ -i /opt/fuzzing/AFL-ICS/tutorials/iec104/in-iec104 \\\n\
   -o "${OUTPUT_DIR}" \\\n\
-  -N tcp://127.0.0.1/10000 -P IEC104 \\\n\
+  -N tcp://127.0.0.1/2404 -P IEC104 \\\n\
   -r /opt/fuzzing/AFL-ICS/sample_specs/Markdown/IEC104.md \\\n\
-  -W 10000 -Y 2 -Z 1 -q 3 -s 3 -E -K -R ./iec104_monitor 10000' > /opt/fuzzing/start_fuzzing.sh && \
+  -W 10000 -Y 2 -Z 1 -q 3 -s 3 -E -K -R ./iec104_monitor 2404' > /opt/fuzzing/start_fuzzing.sh && \
     chmod +x /opt/fuzzing/start_fuzzing.sh
 
 # 启动模糊测试
