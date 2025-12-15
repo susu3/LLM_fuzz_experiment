@@ -1,0 +1,79 @@
+services:
+  afl-ics-freyrscada-iec104:
+    build:
+      context: .
+      dockerfile: dockerfiles-freyrscada-iec104/Dockerfile.freyrscada-iec104.afl-ics
+      ssh:
+        - default
+    container_name: afl-ics-freyrscada-iec104
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-freyrscada
+
+  aflnet-freyrscada-iec104:
+    build:
+      context: .
+      dockerfile: dockerfiles-freyrscada-iec104/Dockerfile.freyrscada-iec104.aflnet
+      ssh:
+        - default
+    container_name: aflnet-freyrscada-iec104
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-freyrscada
+
+  chatafl-freyrscada-iec104:
+    build:
+      context: .
+      dockerfile: dockerfiles-freyrscada-iec104/Dockerfile.freyrscada-iec104.chatafl
+    container_name: chatafl-freyrscada-iec104
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-freyrscada
+
+  a2-freyrscada-iec104:
+    build:
+      context: .
+      dockerfile: dockerfiles-freyrscada-iec104/Dockerfile.freyrscada-iec104.a2
+    container_name: a2-freyrscada-iec104
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-freyrscada
+
+  a3-freyrscada-iec104:
+    build:
+      context: .
+      dockerfile: dockerfiles-freyrscada-iec104/Dockerfile.freyrscada-iec104.a3
+    container_name: a3-freyrscada-iec104
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-freyrscada
+
+networks:
+  fuzzing-network-freyrscada:
+    driver: bridge
+
