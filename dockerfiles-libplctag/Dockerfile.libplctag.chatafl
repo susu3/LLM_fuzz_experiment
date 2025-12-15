@@ -71,6 +71,7 @@ ENV LDFLAGS="-fsanitize=address -pie"
 # 从 GitHub 克隆 libplctag 源代码并编译
 RUN git clone https://github.com/libplctag/libplctag.git libplctag && \
     cd libplctag && \
+    git checkout v2.6.12 && \
     mkdir -p build && cd build && \
     cmake -DCMAKE_C_COMPILER=/opt/fuzzing/chatafl/ChatAFL/afl-clang-fast \
           -DCMAKE_CXX_COMPILER=/opt/fuzzing/chatafl/ChatAFL/afl-clang-fast++ \
