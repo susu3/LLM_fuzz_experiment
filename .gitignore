@@ -71,5 +71,7 @@ htmlcov/
 # test target
 libplctag/
 libmodbus/
+freyrscada-iec104-temp/
+freyrscada-temp2/
 
 

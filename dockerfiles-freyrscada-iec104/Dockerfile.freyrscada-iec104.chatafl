@@ -52,7 +52,9 @@ RUN git clone https://github.com/FreyrSCADA/IEC-60870-5-104.git freyrscada-iec10
     cd freyrscada-iec104/IEC104-Linux-SDK && \
     unzip IEC104-LinuxSDK.zip
 
-# Set up AFL environment
+# Set PATH and AFL environment (must be before compilation)
+ENV PATH="/opt/fuzzing/chatafl/ChatAFL:$PATH"
+ENV AFL_PATH="/opt/fuzzing/chatafl/ChatAFL"
 ENV AFL_USE_ASAN=1
 ENV CC="/opt/fuzzing/chatafl/ChatAFL/afl-clang-fast"
 ENV CXX="/opt/fuzzing/chatafl/ChatAFL/afl-clang-fast++"
@@ -72,9 +74,6 @@ RUN cd /opt/fuzzing/freyrscada-iec104/IEC104-Linux-SDK/LinuxSDK/x86_64/project &
     make -f iec104servertest.mak clean && \
     make -f iec104servertest.mak
 
-# Set PATH
-ENV PATH="/opt/fuzzing/chatafl/ChatAFL:$PATH"
-
 # Create output directory
 RUN mkdir -p /opt/fuzzing/results
 
@@ -91,10 +90,10 @@ echo "Starting ChatAFL fuzzing for FreyrSCADA IEC104 run #${RUN_NUM}"\n\
 echo "Output directory: ${OUTPUT_DIR}"\n\
 export ASAN_OPTIONS="abort_on_error=1:detect_leaks=0:symbolize=0:allocator_may_return_null=1"\n\
 cd /opt/fuzzing/freyrscada-iec104/IEC104-Linux-SDK/LinuxSDK/x86_64/output && \\\n\
-afl-fuzz -d -m none -t 10000+ -i /opt/fuzzing/chatafl/ChatAFL/tutorials/iec104/in-iec104 \\\n\
+afl-fuzz -d -m none -t 5000+ -i /opt/fuzzing/chatafl/ChatAFL/tutorials/iec104/in-iec104 \\\n\
   -o "${OUTPUT_DIR}" \\\n\
   -N tcp://127.0.0.1/2404 -P IEC104 \\\n\
-  -W 10000 -q 3 -s 3 -E -K -R ./iec104servertest 2404' > /opt/fuzzing/start_fuzzing.sh && \
+  -D 10000 -q 3 -s 3 -E -K -R ./iec104servertest 2404' > /opt/fuzzing/start_fuzzing.sh && \
     chmod +x /opt/fuzzing/start_fuzzing.sh
 
 CMD ["/opt/fuzzing/start_fuzzing.sh"]

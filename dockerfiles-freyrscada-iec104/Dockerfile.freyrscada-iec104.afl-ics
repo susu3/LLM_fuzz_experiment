@@ -20,6 +20,7 @@ RUN --mount=type=ssh \
     cd llvm_mode && make
 
 ENV PATH="/opt/fuzzing/AFL-ICS:$PATH"
+ENV AFL_PATH="/opt/fuzzing/AFL-ICS"
 ENV AFL_USE_ASAN=1
 
 RUN git clone https://github.com/FreyrSCADA/IEC-60870-5-104.git freyrscada-iec104 && \
@@ -46,11 +47,11 @@ echo "Starting AFL-ICS fuzzing for FreyrSCADA IEC104 run #${RUN_NUM}"\n\
 echo "Output directory: ${OUTPUT_DIR}"\n\
 export ASAN_OPTIONS="abort_on_error=1:detect_leaks=0:symbolize=0:allocator_may_return_null=1"\n\
 cd /opt/fuzzing/freyrscada-iec104/IEC104-Linux-SDK/LinuxSDK/x86_64/output && \\\n\
-afl-fuzz -d -m none -t 10000+ -i /opt/fuzzing/AFL-ICS/tutorials/iec104/in-iec104 \\\n\
+afl-fuzz -d -m none -t 5000+ -i /opt/fuzzing/AFL-ICS/tutorials/iec104/in-iec104 \\\n\
   -o "${OUTPUT_DIR}" \\\n\
   -N tcp://127.0.0.1/2404 -P IEC104 \\\n\
   -r /opt/fuzzing/AFL-ICS/sample_specs/Markdown/IEC104.md \\\n\
-  -W 10000 -Y 2 -Z 1 -q 3 -s 3 -E -K -R ./iec104servertest 2404' > /opt/fuzzing/start_fuzzing.sh && \
+  -D 10000 -Y 2 -Z 1 -q 3 -s 3 -E -K -R ./iec104servertest 2404' > /opt/fuzzing/start_fuzzing.sh && \
     chmod +x /opt/fuzzing/start_fuzzing.sh
 
 CMD ["/opt/fuzzing/start_fuzzing.sh"]
