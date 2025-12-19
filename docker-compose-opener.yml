@@ -1,0 +1,78 @@
+services:
+  afl-ics-opener:
+    build:
+      context: .
+      dockerfile: dockerfiles-opener/Dockerfile.opener.afl-ics
+      ssh:
+        - default
+    container_name: afl-ics-opener
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-opener
+
+  aflnet-opener:
+    build:
+      context: .
+      dockerfile: dockerfiles-opener/Dockerfile.opener.aflnet
+      ssh:
+        - default
+    container_name: aflnet-opener
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-opener
+
+  chatafl-opener:
+    build:
+      context: .
+      dockerfile: dockerfiles-opener/Dockerfile.opener.chatafl
+    container_name: chatafl-opener
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-opener
+
+  a2-opener:
+    build:
+      context: .
+      dockerfile: dockerfiles-opener/Dockerfile.opener.a2
+    container_name: a2-opener
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-opener
+
+  a3-opener:
+    build:
+      context: .
+      dockerfile: dockerfiles-opener/Dockerfile.opener.a3
+    container_name: a3-opener
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-opener
+
+networks:
+  fuzzing-network-opener:
+    driver: bridge

@@ -1,0 +1,55 @@
+FROM ubuntu:20.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --fix-missing \
+    build-essential git wget autoconf libtool pkg-config make automake gcc g++ \
+    python3 python3-pip patch vim graphviz-dev libcap-dev libcurl4-openssl-dev \
+    libjson-c-dev libpcre2-dev tmux tcpdump watch net-tools iputils-ping \
+    iproute2 procps clang llvm llvm-10 llvm-10-tools llvm-10-runtime
+
+# Install newer CMake via pip
+RUN pip3 install cmake --upgrade
+
+WORKDIR /opt/fuzzing
+
+RUN git clone https://github.com/susu3/A3.git A3 && \
+    cd A3 && \
+    make clean all && \
+    cd llvm_mode && make
+
+ENV PATH="/opt/fuzzing/A3:$PATH"
+ENV AFL_PATH="/opt/fuzzing/A3"
+
+COPY OpENer /opt/fuzzing/OpENer
+COPY dockerfiles-opener/seeds /opt/fuzzing/seeds-opener
+
+# Build OpENer as network server (WITHOUT FUZZING_AFL - normal network mode)
+RUN cd /opt/fuzzing/OpENer && \
+    mkdir -p build-server && cd build-server && \
+    cmake -DCMAKE_C_COMPILER=/opt/fuzzing/A3/afl-clang-fast \
+          -DOpENer_PLATFORM:STRING="POSIX" \
+          -DCMAKE_BUILD_TYPE:STRING="" \
+          -DBUILD_SHARED_LIBS:BOOL=OFF \
+          ../source && \
+    make -j$(nproc)
+
+RUN mkdir -p /opt/fuzzing/results
+RUN useradd -m -s /bin/bash fuzzer && chown -R fuzzer:fuzzer /opt/fuzzing
+USER fuzzer
+
+RUN echo '#!/bin/bash\n\
+RUN_NUM=${RUN_NUM:-1}\n\
+OUTPUT_DIR="/opt/fuzzing/results/opener-a3-${RUN_NUM}"\n\
+echo "Starting A3 fuzzing for OpENer run #${RUN_NUM}"\n\
+echo "Output directory: ${OUTPUT_DIR}"\n\
+cd /opt/fuzzing && \\\n\
+afl-fuzz -d -m none -t 5000+ -i /opt/fuzzing/seeds-opener \\\n\
+  -o "${OUTPUT_DIR}" \\\n\
+  -r /opt/fuzzing/A3/sample_specs/Markdown/ethernetip.txt \\\n\
+  -N tcp://127.0.0.1/44818 -P ETHERNETIP \\\n\
+  -D 10000 -q 3 -s 3 -E -K -R \\\n\
+  /opt/fuzzing/OpENer/build-server/src/ports/POSIX/OpENer lo' > /opt/fuzzing/start_fuzzing.sh && \
+    chmod +x /opt/fuzzing/start_fuzzing.sh
+
+CMD ["/opt/fuzzing/start_fuzzing.sh"]
