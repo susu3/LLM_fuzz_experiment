@@ -1,0 +1,63 @@
+FROM ubuntu:20.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --fix-missing \
+    build-essential git wget cmake autoconf libtool pkg-config make automake gcc g++ \
+    python3 python3-pip patch vim graphviz-dev libcap-dev libcurl4-openssl-dev \
+    libjson-c-dev libpcre2-dev tmux tcpdump watch net-tools iputils-ping \
+    iproute2 procps clang llvm llvm-10 llvm-10-tools llvm-10-runtime
+
+WORKDIR /opt/fuzzing
+
+RUN --mount=type=ssh \
+    mkdir -p ~/.ssh && \
+    ssh-keyscan github.com >> ~/.ssh/known_hosts && \
+    git clone git@github.com:susu3/AFL-ICS.git AFL-ICS && \
+    cd AFL-ICS && \
+    make clean all && \
+    cd llvm_mode && make
+
+ENV PATH="/opt/fuzzing/AFL-ICS:$PATH"
+ENV AFL_PATH="/opt/fuzzing/AFL-ICS"
+ENV AFL_USE_ASAN=1
+
+RUN git clone https://github.com/nimbuscontrols/EIPScanner.git eipscanner
+
+COPY dockerfiles-eipscanner/EIPServerHarness.cpp /opt/fuzzing/eipscanner/examples/
+COPY dockerfiles-eipscanner/eipscanner-cmake.patch /tmp/
+COPY dockerfiles-eipscanner/seeds /opt/fuzzing/seeds-eipscanner
+
+RUN cd /opt/fuzzing/eipscanner && \
+    patch -p1 < /tmp/eipscanner-cmake.patch && \
+    rm /tmp/eipscanner-cmake.patch
+
+RUN cd /opt/fuzzing/eipscanner && \
+    mkdir -p build && cd build && \
+    cmake -DEXAMPLE_ENABLED=ON \
+          -DCMAKE_C_COMPILER=/opt/fuzzing/AFL-ICS/afl-clang-fast \
+          -DCMAKE_CXX_COMPILER=/opt/fuzzing/AFL-ICS/afl-clang-fast++ \
+          -DCMAKE_CXX_FLAGS="-fsanitize=address -g -O0" \
+          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address" \
+          .. && \
+    make -j$(nproc) eip_server_harness
+
+RUN mkdir -p /opt/fuzzing/results
+RUN useradd -m -s /bin/bash fuzzer && chown -R fuzzer:fuzzer /opt/fuzzing
+USER fuzzer
+
+RUN echo '#!/bin/bash\n\
+RUN_NUM=${RUN_NUM:-1}\n\
+OUTPUT_DIR="/opt/fuzzing/results/eipscanner-afl-ics-${RUN_NUM}"\n\
+echo "Starting AFL-ICS fuzzing for EIPScanner run #${RUN_NUM}"\n\
+echo "Output directory: ${OUTPUT_DIR}"\n\
+export ASAN_OPTIONS="abort_on_error=1:detect_leaks=0:symbolize=0:allocator_may_return_null=1"\n\
+cd /opt/fuzzing/eipscanner/build/examples && \\\n\
+afl-fuzz -d -m none -t 5000+ -i /opt/fuzzing/seeds-eipscanner \\\n\
+  -o "${OUTPUT_DIR}" \\\n\
+  -N tcp://127.0.0.1/44818 -P ETHERNETIP \\\n\
+  -r /opt/fuzzing/AFL-ICS/sample_specs/Markdown/ethernetip.md \\\n\
+  -D 10000 -Y 2 -Z 1 -q 3 -s 3 -E -K -R ./eip_server_harness 44818' > /opt/fuzzing/start_fuzzing.sh && \
+    chmod +x /opt/fuzzing/start_fuzzing.sh
+
+CMD ["/opt/fuzzing/start_fuzzing.sh"]

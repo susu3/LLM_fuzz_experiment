@@ -1,0 +1,78 @@
+services:
+  afl-ics-eipscanner:
+    build:
+      context: .
+      dockerfile: dockerfiles-eipscanner/Dockerfile.eipscanner.afl-ics
+      ssh:
+        - default
+    container_name: afl-ics-eipscanner
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-eipscanner
+
+  aflnet-eipscanner:
+    build:
+      context: .
+      dockerfile: dockerfiles-eipscanner/Dockerfile.eipscanner.aflnet
+      ssh:
+        - default
+    container_name: aflnet-eipscanner
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-eipscanner
+
+  chatafl-eipscanner:
+    build:
+      context: .
+      dockerfile: dockerfiles-eipscanner/Dockerfile.eipscanner.chatafl
+    container_name: chatafl-eipscanner
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-eipscanner
+
+  a2-eipscanner:
+    build:
+      context: .
+      dockerfile: dockerfiles-eipscanner/Dockerfile.eipscanner.a2
+    container_name: a2-eipscanner
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-eipscanner
+
+  a3-eipscanner:
+    build:
+      context: .
+      dockerfile: dockerfiles-eipscanner/Dockerfile.eipscanner.a3
+    container_name: a3-eipscanner
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-eipscanner
+
+networks:
+  fuzzing-network-eipscanner:
+    driver: bridge
