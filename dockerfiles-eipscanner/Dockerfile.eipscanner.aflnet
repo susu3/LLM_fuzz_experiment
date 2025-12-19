@@ -56,7 +56,7 @@ cd /opt/fuzzing/eipscanner/build/examples && \\\n\
 afl-fuzz -d -m none -t 5000+ -i /opt/fuzzing/seeds-eipscanner \\\n\
   -o "${OUTPUT_DIR}" \\\n\
   -N tcp://127.0.0.1/44818 -P ETHERNETIP \\\n\
-  -W 10000 -q 3 -s 3 -E -K -R ./eip_server_harness 44818' > /opt/fuzzing/start_fuzzing.sh && \
+  -D 10000 -q 3 -s 3 -E -K -R ./eip_server_harness 44818' > /opt/fuzzing/start_fuzzing.sh && \
     chmod +x /opt/fuzzing/start_fuzzing.sh
 
 CMD ["/opt/fuzzing/start_fuzzing.sh"]
