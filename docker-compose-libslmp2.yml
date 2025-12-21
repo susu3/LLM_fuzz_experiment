@@ -1,0 +1,78 @@
+services:
+  afl-ics-libslmp2:
+    build:
+      context: .
+      dockerfile: dockerfiles-libslmp2/Dockerfile.libslmp2.afl-ics
+      ssh:
+        - default
+    container_name: afl-ics-libslmp2
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-libslmp2
+
+  aflnet-libslmp2:
+    build:
+      context: .
+      dockerfile: dockerfiles-libslmp2/Dockerfile.libslmp2.aflnet
+      ssh:
+        - default
+    container_name: aflnet-libslmp2
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-libslmp2
+
+  chatafl-libslmp2:
+    build:
+      context: .
+      dockerfile: dockerfiles-libslmp2/Dockerfile.libslmp2.chatafl
+    container_name: chatafl-libslmp2
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-libslmp2
+
+  a2-libslmp2:
+    build:
+      context: .
+      dockerfile: dockerfiles-libslmp2/Dockerfile.libslmp2.a2
+    container_name: a2-libslmp2
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-libslmp2
+
+  a3-libslmp2:
+    build:
+      context: .
+      dockerfile: dockerfiles-libslmp2/Dockerfile.libslmp2.a3
+    container_name: a3-libslmp2
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-libslmp2
+
+networks:
+  fuzzing-network-libslmp2:
+    driver: bridge

@@ -78,3 +78,6 @@ eipscanner*
 OpENer
 
 
+
+# libslmp2 fuzzing
+libslmp2/

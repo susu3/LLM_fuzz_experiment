@@ -24,7 +24,9 @@ RUN --mount=type=ssh \
 ENV PATH="/opt/fuzzing/AFL-ICS:$PATH"
 ENV AFL_PATH="/opt/fuzzing/AFL-ICS"
 
-COPY OpENer /opt/fuzzing/OpENer
+# Clone OpENer from GitHub
+RUN git clone https://github.com/EIPStackGroup/OpENer.git OpENer
+
 COPY dockerfiles-opener/seeds /opt/fuzzing/seeds-opener
 
 # Build OpENer as network server (WITHOUT FUZZING_AFL - normal network mode)

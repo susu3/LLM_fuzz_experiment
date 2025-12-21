@@ -1,0 +1,58 @@
+FROM ubuntu:20.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --fix-missing \
+    build-essential git wget cmake autoconf libtool pkg-config make automake gcc g++ \
+    python3 python3-pip patch vim graphviz-dev libcap-dev libcurl4-openssl-dev \
+    libjson-c-dev libpcre2-dev tmux tcpdump watch net-tools iputils-ping \
+    iproute2 procps clang llvm llvm-10 llvm-10-tools llvm-10-runtime
+
+WORKDIR /opt/fuzzing
+
+RUN git clone https://github.com/susu3/A3.git A3 && \
+    cd A3 && \
+    make clean all && \
+    cd llvm_mode && make
+
+ENV PATH="/opt/fuzzing/A3:$PATH"
+ENV AFL_PATH="/opt/fuzzing/A3"
+
+# Clone libslmp2 from GitHub
+RUN git clone https://github.com/Neucrede/libslmp2.git libslmp2
+
+COPY dockerfiles-libslmp2/seeds /opt/fuzzing/seeds-libslmp2
+COPY dockerfiles-libslmp2/svrskel_afl.c /opt/fuzzing/
+
+# Build libslmp2 with AFL-friendly server
+COPY dockerfiles-libslmp2/add-svrskel-afl.patch /opt/fuzzing/
+RUN cd /opt/fuzzing/libslmp2 && \
+    cp /opt/fuzzing/svrskel_afl.c samples/svrskel/ && \
+    patch -p1 < /opt/fuzzing/add-svrskel-afl.patch && \
+    rm -rf build && mkdir build && cd build && \
+    cmake -DCMAKE_C_COMPILER=/opt/fuzzing/A3/afl-clang-fast \
+          -DCMAKE_CXX_COMPILER=/opt/fuzzing/A3/afl-clang-fast++ \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_SHARED_LIBS=OFF \
+          .. && \
+    make -j$(nproc) svrskel_afl
+
+RUN mkdir -p /opt/fuzzing/results
+RUN useradd -m -s /bin/bash fuzzer && chown -R fuzzer:fuzzer /opt/fuzzing
+USER fuzzer
+
+RUN echo '#!/bin/bash\n\
+RUN_NUM=${RUN_NUM:-1}\n\
+OUTPUT_DIR="/opt/fuzzing/results/libslmp2-a3-${RUN_NUM}"\n\
+echo "Starting A3 fuzzing for libslmp2 run #${RUN_NUM}"\n\
+echo "Output directory: ${OUTPUT_DIR}"\n\
+cd /opt/fuzzing && \\\n\
+afl-fuzz -d -m none -t 5000+ -i /opt/fuzzing/seeds-libslmp2 \\\n\
+  -o "${OUTPUT_DIR}" \\\n\
+  -r /opt/fuzzing/A3/sample_specs/Markdown/slmp.txt \\\n\
+  -N tcp://127.0.0.1/8888 -P SLMPB \\\n\
+  -D 10000 -q 3 -s 3 -E -K -R \\\n\
+  /opt/fuzzing/libslmp2/build/samples/svrskel/svrskel_afl 8888' > /opt/fuzzing/start_fuzzing.sh && \
+    chmod +x /opt/fuzzing/start_fuzzing.sh
+
+CMD ["/opt/fuzzing/start_fuzzing.sh"]

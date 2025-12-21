@@ -3,13 +3,10 @@ FROM ubuntu:20.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --fix-missing \
-    build-essential git wget autoconf libtool pkg-config make automake gcc g++ \
+    build-essential git wget cmake autoconf libtool pkg-config make automake gcc g++ \
     python3 python3-pip patch vim graphviz-dev libcap-dev libcurl4-openssl-dev \
     libjson-c-dev libpcre2-dev tmux tcpdump watch net-tools iputils-ping \
     iproute2 procps clang llvm llvm-10 llvm-10-tools llvm-10-runtime
-
-# Install newer CMake via pip
-RUN pip3 install cmake --upgrade
 
 WORKDIR /opt/fuzzing
 
@@ -24,20 +21,24 @@ RUN --mount=type=ssh \
 ENV PATH="/opt/fuzzing/aflnet-ICS-:$PATH"
 ENV AFL_PATH="/opt/fuzzing/aflnet-ICS-"
 
-# Clone OpENer from GitHub
-RUN git clone https://github.com/EIPStackGroup/OpENer.git OpENer
+# Clone libslmp2 from GitHub
+RUN git clone https://github.com/Neucrede/libslmp2.git libslmp2
 
-COPY dockerfiles-opener/seeds /opt/fuzzing/seeds-opener
+COPY dockerfiles-libslmp2/seeds /opt/fuzzing/seeds-libslmp2
+COPY dockerfiles-libslmp2/svrskel_afl.c /opt/fuzzing/
+COPY dockerfiles-libslmp2/add-svrskel-afl.patch /opt/fuzzing/
 
-# Build OpENer as network server (WITHOUT FUZZING_AFL - normal network mode)
-RUN cd /opt/fuzzing/OpENer && \
-    mkdir -p build-server && cd build-server && \
+# Build libslmp2 with AFL-friendly server
+RUN cd /opt/fuzzing/libslmp2 && \
+    cp /opt/fuzzing/svrskel_afl.c samples/svrskel/ && \
+    patch -p1 < /opt/fuzzing/add-svrskel-afl.patch && \
+    rm -rf build && mkdir build && cd build && \
     cmake -DCMAKE_C_COMPILER=/opt/fuzzing/aflnet-ICS-/afl-clang-fast \
-          -DOpENer_PLATFORM:STRING="POSIX" \
-          -DCMAKE_BUILD_TYPE:STRING="" \
-          -DBUILD_SHARED_LIBS:BOOL=OFF \
-          ../source && \
-    make -j$(nproc)
+          -DCMAKE_CXX_COMPILER=/opt/fuzzing/aflnet-ICS-/afl-clang-fast++ \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_SHARED_LIBS=OFF \
+          .. && \
+    make -j$(nproc) svrskel_afl
 
 RUN mkdir -p /opt/fuzzing/results
 RUN useradd -m -s /bin/bash fuzzer && chown -R fuzzer:fuzzer /opt/fuzzing
@@ -45,15 +46,15 @@ USER fuzzer
 
 RUN echo '#!/bin/bash\n\
 RUN_NUM=${RUN_NUM:-1}\n\
-OUTPUT_DIR="/opt/fuzzing/results/opener-aflnet-${RUN_NUM}"\n\
-echo "Starting AFLNet fuzzing for OpENer run #${RUN_NUM}"\n\
+OUTPUT_DIR="/opt/fuzzing/results/libslmp2-aflnet-${RUN_NUM}"\n\
+echo "Starting AFLNet fuzzing for libslmp2 run #${RUN_NUM}"\n\
 echo "Output directory: ${OUTPUT_DIR}"\n\
 cd /opt/fuzzing && \\\n\
-afl-fuzz -d -m none -t 5000+ -i /opt/fuzzing/seeds-opener \\\n\
+afl-fuzz -d -m none -t 5000+ -i /opt/fuzzing/seeds-libslmp2 \\\n\
   -o "${OUTPUT_DIR}" \\\n\
-  -N tcp://127.0.0.1/44818 -P ETHERNETIP \\\n\
+  -N tcp://127.0.0.1/8888 -P SLMPB \\\n\
   -D 10000 -q 3 -s 3 -E -K -R \\\n\
-  /opt/fuzzing/OpENer/build-server/src/ports/POSIX/OpENer lo' > /opt/fuzzing/start_fuzzing.sh && \
+  /opt/fuzzing/libslmp2/build/samples/svrskel/svrskel_afl 8888' > /opt/fuzzing/start_fuzzing.sh && \
     chmod +x /opt/fuzzing/start_fuzzing.sh
 
 CMD ["/opt/fuzzing/start_fuzzing.sh"]
