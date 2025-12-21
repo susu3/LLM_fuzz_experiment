@@ -1,0 +1,78 @@
+services:
+  aflnet-libslmp2-ascii:
+    build:
+      context: .
+      dockerfile: dockerfiles-libslmp2-ascii/Dockerfile.libslmp2-ascii.aflnet
+      ssh:
+        - default
+    container_name: aflnet-libslmp2-ascii
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-libslmp2-ascii
+
+  a2-libslmp2-ascii:
+    build:
+      context: .
+      dockerfile: dockerfiles-libslmp2-ascii/Dockerfile.libslmp2-ascii.a2
+    container_name: a2-libslmp2-ascii
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-libslmp2-ascii
+
+  a3-libslmp2-ascii:
+    build:
+      context: .
+      dockerfile: dockerfiles-libslmp2-ascii/Dockerfile.libslmp2-ascii.a3
+    container_name: a3-libslmp2-ascii
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-libslmp2-ascii
+
+  afl-ics-libslmp2-ascii:
+    build:
+      context: .
+      dockerfile: dockerfiles-libslmp2-ascii/Dockerfile.libslmp2-ascii.afl-ics
+      ssh:
+        - default
+    container_name: afl-ics-libslmp2-ascii
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-libslmp2-ascii
+
+  chatafl-libslmp2-ascii:
+    build:
+      context: .
+      dockerfile: dockerfiles-libslmp2-ascii/Dockerfile.libslmp2-ascii.chatafl
+    container_name: chatafl-libslmp2-ascii
+    restart: unless-stopped
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - RUN_NUM=${RUN_NUM}
+    volumes:
+      - ./results:/opt/fuzzing/results
+    networks:
+      - fuzzing-network-libslmp2-ascii
+
+networks:
+  fuzzing-network-libslmp2-ascii:
+    driver: bridge
