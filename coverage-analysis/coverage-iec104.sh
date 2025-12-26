@@ -3,23 +3,33 @@
 # Coverage Analysis Script for IEC104 Fuzzing
 # This script uses gcovr to analyze code coverage after replaying test cases
 # Includes server monitoring and automatic restart functionality
-# 使用方法: ./coverage-iec104.sh [fuzzer] [run_number]
-# 示例: ./coverage-iec104.sh aflnet 1
-#       ./coverage-iec104.sh afl-ics 1
+# 使用方法: ./coverage-iec104.sh [target] [fuzzer] [run_number]
+# 示例: ./coverage-iec104.sh iec104 aflnet 1
+#       ./coverage-iec104.sh freyrscada-iec104 afl-ics 1
 
 set -e
 
-# 参数解析（可选，默认为 aflnet）
-FUZZER="${1:-aflnet}"          # afl-ics, aflnet, chatafl, a2, a3
-RUN_NUM="${2:-1}"              # 实验次数
+# 参数解析（可选，默认为 iec104）
+TARGET_IMPL="${1:-iec104}"     # iec104 或 freyrscada-iec104
+FUZZER="${2:-aflnet}"          # afl-ics, aflnet, chatafl, a2, a3
+RUN_NUM="${3:-1}"              # 实验次数
 
-# Configuration - 使用绝对路径
+# Configuration - 根据目标调整（使用绝对路径）
 BASE_DIR="/home/ecs-user/LLM_fuzz_experiment"
-IEC104_DIR="$BASE_DIR/IEC104"
-OUTPUT_DIR="$BASE_DIR/results/iec104-${FUZZER}-${RUN_NUM}"
-COVERAGE_DIR="$BASE_DIR/coverage-reports"
-REPLAY_SCRIPT="$BASE_DIR/coverage-analysis/replay-iec104.sh"
-SERVER_PORT="10000"
+
+if [ "$TARGET_IMPL" = "freyrscada-iec104" ]; then
+    IEC104_DIR="$BASE_DIR/freyrscada-iec104"
+    OUTPUT_DIR="$BASE_DIR/results/freyrscada-iec104-${FUZZER}-${RUN_NUM}"
+    COVERAGE_DIR="$BASE_DIR/coverage-reports"
+    REPLAY_SCRIPT="$BASE_DIR/coverage-analysis/replay-iec104.sh"
+    SERVER_PORT="2404"
+else
+    IEC104_DIR="$BASE_DIR/IEC104"
+    OUTPUT_DIR="$BASE_DIR/results/iec104-${FUZZER}-${RUN_NUM}"
+    COVERAGE_DIR="$BASE_DIR/coverage-reports"
+    REPLAY_SCRIPT="$BASE_DIR/coverage-analysis/replay-iec104.sh"
+    SERVER_PORT="2404"  # iec104 也使用 2404 端口
+fi
 
 SERVER_CHECK_INTERVAL=5  # Check server status every 5 seconds
 MAX_SERVER_RESTART_ATTEMPTS=100  # 增加重启次数限制
@@ -32,6 +42,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}=== IEC104 Coverage Analysis Tool ===${NC}"
+echo -e "${BLUE}Target: $TARGET_IMPL | Fuzzer: $FUZZER | Run: #$RUN_NUM${NC}"
 
 # Global variables
 SERVER_PID=""
@@ -81,36 +92,106 @@ check_prerequisites() {
 
 # Rebuild with coverage flags
 rebuild_with_coverage() {
-    print_status "Rebuilding IEC104 with coverage instrumentation..."
-    
-    cd "$IEC104_DIR/test"
+    print_status "Rebuilding $TARGET_IMPL with coverage instrumentation..."
     
     # Configure with coverage flags
     export CFLAGS="-fprofile-arcs -ftest-coverage -O0 -g"
     export CXXFLAGS="-fprofile-arcs -ftest-coverage -O0 -g"
     export LDFLAGS="-fprofile-arcs -ftest-coverage"
     
-    # 彻底清理之前的覆盖率数据
-    print_status "Cleaning previous coverage data..."
-    make clean || true
-    find . -name "*.gcda" -delete 2>/dev/null || true
-    find . -name "*.gcno" -delete 2>/dev/null || true
-    
-    # 修改Makefile来使用覆盖率标志
-    print_status "Configuring with coverage flags: $CFLAGS"
-    sed -i 's/^CC = .*/CC = gcc/' Makefile
-    sed -i '/^CFLAGS +=/d' Makefile
-    sed -i '/^LDFLAGS +=/d' Makefile
-    echo "CFLAGS +=-I\$(MODULE_PATH) -lpthread" >> Makefile
-    echo "CFLAGS +=-Wno-return-type -fprofile-arcs -ftest-coverage -O0 -g" >> Makefile
-    echo "LDFLAGS +=-fprofile-arcs -ftest-coverage" >> Makefile
-    
-    # Clean and rebuild with coverage
-    make clean
-    
-    # Force rebuild with coverage flags
-    print_status "Building with coverage instrumentation..."
-    make all V=1
+    if [ "$TARGET_IMPL" = "freyrscada-iec104" ]; then
+        # FreyrSCADA IEC104 has different directory structure
+        cd "$IEC104_DIR/IEC104-Linux-SDK/LinuxSDK/x86_64"
+        
+        # 彻底清理之前的覆盖率数据
+        print_status "Cleaning previous coverage data..."
+        find . -name "*.gcda" -delete 2>/dev/null || true
+        find . -name "*.gcno" -delete 2>/dev/null || true
+        
+        # 检查是否需要应用patch（检查main函数签名）
+        print_status "Checking if patch needs to be applied..."
+        if ! grep -q "int main(int argc" source/simpleIEC104server.c 2>/dev/null; then
+            print_status "Applying FreyrSCADA IEC104 fuzzing patch..."
+            
+            if [ -f "$BASE_DIR/dockerfiles-freyrscada-iec104/freyrscada-iec104-fuzzing.patch" ]; then
+                # 先转换行尾
+                sed -i 's/\r$//' source/simpleIEC104server.c project/iec104servertest.mak 2>/dev/null || true
+                # 应用patch（使用--forward跳过已应用的部分）
+                patch -p1 --forward < "$BASE_DIR/dockerfiles-freyrscada-iec104/freyrscada-iec104-fuzzing.patch" || true
+                print_status "Patch processing completed"
+            else
+                print_error "Patch file not found"
+                exit 1
+            fi
+        else
+            print_status "Patch already applied, skipping..."
+        fi
+        
+        # 修改Makefile添加覆盖率标志并使用gcc
+        cd project
+        print_status "Configuring Makefile with coverage flags..."
+        print_warning "Note: FreyrSCADA uses precompiled library (libx86_x64-iec104.a) without source code."
+        print_warning "Coverage will only be available for wrapper code, not core IEC104 protocol implementation."
+        
+        # 恢复使用gcc而不是afl-clang-fast
+        sed -i 's/^CC = .*/CC = gcc/' iec104servertest.mak
+        sed -i 's/^CXX = .*/CXX = g++/' iec104servertest.mak
+        sed -i 's/^LD = .*/LD = g++/' iec104servertest.mak
+        sed -i 's/^AR = .*/AR = ar/' iec104servertest.mak
+        
+        # 添加CFLAGS_RELEASE和LDFLAGS_RELEASE定义（Makefile中没有这些）
+        sed -i '/^CFLAGS_RELEASE = /d' iec104servertest.mak 2>/dev/null || true
+        sed -i '/^LDFLAGS_RELEASE = /d' iec104servertest.mak 2>/dev/null || true
+        sed -i '/^INC_RELEASE = /a CFLAGS_RELEASE = -Wall -fprofile-arcs -ftest-coverage -O0 -g' iec104servertest.mak
+        sed -i '/^RCFLAGS_RELEASE = /a LDFLAGS_RELEASE = -fprofile-arcs -ftest-coverage' iec104servertest.mak
+        
+        # Clean and rebuild
+        print_status "Building with coverage instrumentation..."
+        make -f iec104servertest.mak clean || true
+        make -f iec104servertest.mak
+        
+    else
+        # Original IEC104
+        cd "$IEC104_DIR/test"
+        
+        # 彻底清理之前的覆盖率数据
+        print_status "Cleaning previous coverage data..."
+        make clean || true
+        find . -name "*.gcda" -delete 2>/dev/null || true
+        find . -name "*.gcno" -delete 2>/dev/null || true
+        
+        # 检查是否需要应用patch
+        print_status "Checking if patch needs to be applied..."
+        if ! grep -q "pthread_testcancel" main.c 2>/dev/null; then
+            print_status "Applying IEC104 fuzzing patch..."
+            
+            if [ -f "$BASE_DIR/dockerfiles-iec104/iec104-fuzzing.patch" ]; then
+                patch -p2 < "$BASE_DIR/dockerfiles-iec104/iec104-fuzzing.patch"
+                print_status "Patch applied successfully"
+            else
+                print_error "Patch file not found"
+                exit 1
+            fi
+        else
+            print_status "Patch already applied, skipping..."
+        fi
+        
+        # 修改Makefile来使用覆盖率标志
+        print_status "Configuring with coverage flags: $CFLAGS"
+        sed -i 's/^CC = .*/CC = gcc/' Makefile
+        sed -i '/^CFLAGS +=/d' Makefile
+        sed -i '/^LDFLAGS +=/d' Makefile
+        echo "CFLAGS +=-I\$(MODULE_PATH) -I. -lpthread" >> Makefile
+        echo "CFLAGS +=-Wno-return-type -fprofile-arcs -ftest-coverage -O0 -g" >> Makefile
+        echo "LDFLAGS +=-fprofile-arcs -ftest-coverage" >> Makefile
+        
+        # Clean and rebuild
+        make clean
+        
+        # Force rebuild with coverage flags
+        print_status "Building with coverage instrumentation..."
+        make all V=1
+    fi
     
     # Check if .gcno files were created during build
     print_status "Checking for .gcno files after build..."
@@ -123,15 +204,20 @@ rebuild_with_coverage() {
         print_status "Coverage instrumentation successful: .gcno files generated at compile time"
     fi
     
-    print_status "IEC104 rebuilt with coverage instrumentation"
+    print_status "$TARGET_IMPL rebuilt with coverage instrumentation"
 }
 
 # Check if coverage server is running
 is_coverage_server_running() {
     local pid=""
     
-    # IEC104 使用 iec104_monitor
-    pid=$(pgrep -f "iec104_monitor.*$SERVER_PORT" 2>/dev/null)
+    if [ "$TARGET_IMPL" = "freyrscada-iec104" ]; then
+        # FreyrSCADA 使用 iec104servertest
+        pid=$(pgrep -f "iec104servertest.*$SERVER_PORT" 2>/dev/null)
+    else
+        # 原始IEC104 使用 iec104_monitor
+        pid=$(pgrep -f "iec104_monitor.*$SERVER_PORT" 2>/dev/null)
+    fi
     
     if [ ! -z "$pid" ]; then
         SERVER_PID=$pid
@@ -143,23 +229,47 @@ is_coverage_server_running() {
 
 # Start coverage-enabled server with monitoring
 start_coverage_server() {
-    print_status "Starting coverage-enabled IEC104 server with monitoring..."
+    print_status "Starting coverage-enabled $TARGET_IMPL server with monitoring..."
     
-    # Kill any existing servers (使用精确匹配，避免杀死其他进程)
-    pkill -f "iec104_monitor $SERVER_PORT" || true
-    pkill -f "\./iec104_monitor" || true
-    sleep 2
-    
-    # Start the coverage-enabled server
-    cd "$IEC104_DIR/test"
-    
-    if [ ! -f "./iec104_monitor" ]; then
-        print_error "iec104_monitor binary not found. Please run rebuild first."
-        exit 1
+    if [ "$TARGET_IMPL" = "freyrscada-iec104" ]; then
+        # FreyrSCADA IEC104
+        # Kill any existing servers
+        pkill -f "iec104servertest $SERVER_PORT" || true
+        pkill -f "\./iec104servertest" || true
+        sleep 2
+        
+        # Start the server
+        cd "$IEC104_DIR/IEC104-Linux-SDK/LinuxSDK/x86_64/output"
+        
+        if [ ! -f "./iec104servertest" ]; then
+            print_error "iec104servertest binary not found. Please run rebuild first."
+            exit 1
+        fi
+        
+        # 设置GCOV环境变量，让.gcda文件生成在intermediate目录
+        export GCOV_PREFIX="../intermediate"
+        export GCOV_PREFIX_STRIP=99
+        
+        ./iec104servertest $SERVER_PORT &
+        SERVER_PID=$!
+    else
+        # Original IEC104
+        # Kill any existing servers
+        pkill -f "iec104_monitor $SERVER_PORT" || true
+        pkill -f "\./iec104_monitor" || true
+        sleep 2
+        
+        # Start the server
+        cd "$IEC104_DIR/test"
+        
+        if [ ! -f "./iec104_monitor" ]; then
+            print_error "iec104_monitor binary not found. Please run rebuild first."
+            exit 1
+        fi
+        
+        ./iec104_monitor $SERVER_PORT &
+        SERVER_PID=$!
     fi
-    
-    ./iec104_monitor $SERVER_PORT &
-    SERVER_PID=$!
     
     # Wait for server to start
     sleep 3
@@ -189,13 +299,25 @@ monitor_coverage_server() {
                 print_status "Restart attempt $SERVER_RESTART_COUNT of $MAX_SERVER_RESTART_ATTEMPTS"
                 
                 # 强制清理可能残留的服务器进程
-                pkill -9 -f "iec104_monitor $SERVER_PORT" 2>/dev/null || true
+                if [ "$TARGET_IMPL" = "freyrscada-iec104" ]; then
+                    pkill -9 -f "iec104servertest $SERVER_PORT" 2>/dev/null || true
+                else
+                    pkill -9 -f "iec104_monitor $SERVER_PORT" 2>/dev/null || true
+                fi
                 
                 # 等待端口释放
                 sleep 2
                 
-                cd "$IEC104_DIR/test"
-                ./iec104_monitor $SERVER_PORT &
+                # 重启服务器
+                if [ "$TARGET_IMPL" = "freyrscada-iec104" ]; then
+                    cd "$IEC104_DIR/IEC104-Linux-SDK/LinuxSDK/x86_64/output"
+                    export GCOV_PREFIX="../intermediate"
+                    export GCOV_PREFIX_STRIP=99
+                    ./iec104servertest $SERVER_PORT &
+                else
+                    cd "$IEC104_DIR/test"
+                    ./iec104_monitor $SERVER_PORT &
+                fi
                 SERVER_PID=$!
                 
                 # 等待服务器启动（增加等待时间）
@@ -254,7 +376,7 @@ run_replay_with_monitoring() {
     
     # Run the replay script with parameters
     print_status "Starting test case replay..."
-    "$REPLAY_SCRIPT" "$FUZZER" "$RUN_NUM"
+    "$REPLAY_SCRIPT" "$TARGET_IMPL" "$FUZZER" "$RUN_NUM"
     
     # Stop server monitoring
     stop_server_monitoring
@@ -263,10 +385,29 @@ run_replay_with_monitoring() {
     
     # Check if .gcda files were generated during execution (runtime coverage data)
     print_status "Checking for .gcda files after server execution..."
+    
+    # 等待一下确保.gcda文件写入完成
+    sleep 2
+    
     GCDA_COUNT=$(find "$IEC104_DIR" -name "*.gcda" 2>/dev/null | wc -l)
-    GCDA_COUNT_TEST=$(find "$IEC104_DIR/test" -name "*.gcda" 2>/dev/null | wc -l)
-    print_status "Found $GCDA_COUNT .gcda files total in IEC104"
-    print_status "Found $GCDA_COUNT_TEST .gcda files in test directory"
+    
+    if [ "$TARGET_IMPL" = "freyrscada-iec104" ]; then
+        GCDA_COUNT_BUILD=$(find "$IEC104_DIR/IEC104-Linux-SDK/LinuxSDK/x86_64" -name "*.gcda" 2>/dev/null | wc -l)
+        print_status "Found $GCDA_COUNT .gcda files total"
+        print_status "Found $GCDA_COUNT_BUILD .gcda files in build directory"
+        
+        # 列出找到的.gcda文件
+        if [ "$GCDA_COUNT_BUILD" -gt 0 ]; then
+            print_status ".gcda files found:"
+            find "$IEC104_DIR/IEC104-Linux-SDK/LinuxSDK/x86_64" -name "*.gcda" 2>/dev/null | while read f; do
+                print_status "  - $f"
+            done
+        fi
+    else
+        GCDA_COUNT_TEST=$(find "$IEC104_DIR/test" -name "*.gcda" 2>/dev/null | wc -l)
+        print_status "Found $GCDA_COUNT .gcda files total in IEC104"
+        print_status "Found $GCDA_COUNT_TEST .gcda files in test directory"
+    fi
     
     if [ "$GCDA_COUNT" -eq 0 ]; then
         print_warning "No .gcda files found. The coverage-enabled server may not have executed properly or no code was covered."
@@ -274,6 +415,7 @@ run_replay_with_monitoring() {
         print_status "  1. The server didn't run successfully"
         print_status "  2. No test cases were executed"
         print_status "  3. The executed code paths didn't trigger coverage data generation"
+        print_status "  4. The server was killed before .gcda files could be written"
     else
         print_status "Runtime coverage data generated successfully: .gcda files created during execution"
     fi
@@ -289,21 +431,29 @@ generate_coverage_reports() {
     # Find coverage data files
     cd "$IEC104_DIR"
     
-    print_status "Searching for coverage files in test directory..."
-    GCNO_FILES=$(find "$IEC104_DIR/test" -name "*.gcno" 2>/dev/null | wc -l)
-    GCDA_FILES=$(find "$IEC104_DIR/test" -name "*.gcda" 2>/dev/null | wc -l)
-    
-    print_status "Found $GCNO_FILES .gcno files in test directory (compile-time coverage data)"
-    print_status "Found $GCDA_FILES .gcda files in test directory (runtime coverage data)"
-    
-    if [ "$GCNO_FILES" -eq 0 ]; then
-        print_error "No .gcno files found in test directory. Coverage instrumentation failed."
-        return 1
+    print_status "Searching for coverage files..."
+    if [ "$TARGET_IMPL" = "freyrscada-iec104" ]; then
+        # FreyrSCADA的文件在intermediate和output目录
+        SEARCH_DIR="$IEC104_DIR/IEC104-Linux-SDK/LinuxSDK/x86_64"
+        GCOVR_ROOT="$IEC104_DIR"
+        GCOVR_OBJECT_DIR="$SEARCH_DIR"
+    else
+        # 原始IEC104的文件在test目录
+        SEARCH_DIR="$IEC104_DIR/test"
+        GCOVR_ROOT="$IEC104_DIR"
+        GCOVR_OBJECT_DIR="$IEC104_DIR/test"
     fi
     
-    # 设置 gcovr 的根目录和对象目录
-    GCOVR_ROOT="$IEC104_DIR"
-    GCOVR_OBJECT_DIR="$IEC104_DIR/test"
+    GCNO_FILES=$(find "$SEARCH_DIR" -name "*.gcno" 2>/dev/null | wc -l)
+    GCDA_FILES=$(find "$SEARCH_DIR" -name "*.gcda" 2>/dev/null | wc -l)
+    
+    print_status "Found $GCNO_FILES .gcno files (compile-time coverage data)"
+    print_status "Found $GCDA_FILES .gcda files (runtime coverage data)"
+    
+    if [ "$GCNO_FILES" -eq 0 ]; then
+        print_error "No .gcno files found. Coverage instrumentation failed."
+        return 1
+    fi
     
     if [ "$GCDA_FILES" -eq 0 ]; then
         print_warning "No .gcda files found. The coverage-enabled server may not have executed or no code was covered."
@@ -315,7 +465,7 @@ generate_coverage_reports() {
     print_status "GCOVR_OBJECT_DIR: $GCOVR_OBJECT_DIR"
     
     # Generate line coverage report only (不带 --branches，只显示行覆盖率)
-    LINE_COVERAGE_FILE="$COVERAGE_DIR/coverage-line-iec104-${FUZZER}-${RUN_NUM}.txt"
+    LINE_COVERAGE_FILE="$COVERAGE_DIR/coverage-line-${TARGET_IMPL}-${FUZZER}-${RUN_NUM}.txt"
     print_status "Generating line coverage report (Lines/Exec/Cover only)..."
     
     if gcovr --root "$GCOVR_ROOT" \
@@ -335,7 +485,7 @@ generate_coverage_reports() {
     fi
     
     # Generate branch coverage report only (带 --branches，只显示分支覆盖率)
-    BRANCH_COVERAGE_FILE="$COVERAGE_DIR/coverage-branch-iec104-${FUZZER}-${RUN_NUM}.txt"
+    BRANCH_COVERAGE_FILE="$COVERAGE_DIR/coverage-branch-${TARGET_IMPL}-${FUZZER}-${RUN_NUM}.txt"
     print_status "Generating branch coverage report (Branches/Taken/Cover only)..."
     
     if gcovr --root "$GCOVR_ROOT" \
@@ -366,11 +516,11 @@ generate_coverage_reports() {
 display_summary() {
     print_status "Coverage Analysis Summary:"
     echo "=========================="
-    echo "Target: IEC104 | Fuzzer: $FUZZER | Run: #$RUN_NUM"
+    echo "Target: $TARGET_IMPL | Fuzzer: $FUZZER | Run: #$RUN_NUM"
     echo ""
     
-    LINE_COVERAGE_FILE="$COVERAGE_DIR/coverage-line-iec104-${FUZZER}-${RUN_NUM}.txt"
-    BRANCH_COVERAGE_FILE="$COVERAGE_DIR/coverage-branch-iec104-${FUZZER}-${RUN_NUM}.txt"
+    LINE_COVERAGE_FILE="$COVERAGE_DIR/coverage-line-${TARGET_IMPL}-${FUZZER}-${RUN_NUM}.txt"
+    BRANCH_COVERAGE_FILE="$COVERAGE_DIR/coverage-branch-${TARGET_IMPL}-${FUZZER}-${RUN_NUM}.txt"
     
     if [ -f "$LINE_COVERAGE_FILE" ]; then
         echo "=== Line Coverage ==="
@@ -402,14 +552,27 @@ cleanup() {
     # Stop server monitoring
     stop_server_monitoring
     
-    # Kill the coverage server
+    # Kill the coverage server gracefully first
     if [ ! -z "$SERVER_PID" ]; then
-        kill $SERVER_PID 2>/dev/null || true
+        # 使用SIGTERM让程序正常退出以写入.gcda
+        kill -TERM $SERVER_PID 2>/dev/null || true
+        sleep 3
+        # 如果还在运行才强制终止
+        if ps -p $SERVER_PID > /dev/null 2>&1; then
+            kill -9 $SERVER_PID 2>/dev/null || true
+        fi
     fi
     
-    # Kill any remaining server processes
-    pkill -f "iec104_monitor $SERVER_PORT" || true
-    pkill -f "\./iec104_monitor" || true
+    # Kill any remaining server processes (gracefully)
+    if [ "$TARGET_IMPL" = "freyrscada-iec104" ]; then
+        pkill -TERM -f "iec104servertest $SERVER_PORT" 2>/dev/null || true
+        sleep 2
+        pkill -9 -f "iec104servertest $SERVER_PORT" 2>/dev/null || true
+    else
+        pkill -TERM -f "iec104_monitor $SERVER_PORT" 2>/dev/null || true
+        sleep 2
+        pkill -9 -f "iec104_monitor $SERVER_PORT" 2>/dev/null || true
+    fi
     
     # Kill monitor process if still running
     if [ ! -z "$MONITOR_PID" ]; then
@@ -432,7 +595,28 @@ main() {
     # Stop the server before generating reports
     print_status "Stopping coverage-enabled server..."
     stop_server_monitoring
-    kill $SERVER_PID 2>/dev/null || true
+    
+    # 优雅地停止服务器以确保.gcda文件被写入
+    if [ ! -z "$SERVER_PID" ]; then
+        print_status "Sending SIGTERM to server (PID: $SERVER_PID)..."
+        kill -TERM $SERVER_PID 2>/dev/null || true
+        
+        # 等待服务器正常退出
+        for i in {1..10}; do
+            if ! ps -p $SERVER_PID > /dev/null 2>&1; then
+                print_status "Server exited gracefully"
+                break
+            fi
+            sleep 1
+        done
+        
+        # 如果还在运行，强制终止
+        if ps -p $SERVER_PID > /dev/null 2>&1; then
+            print_warning "Server didn't exit gracefully, forcing termination..."
+            kill -9 $SERVER_PID 2>/dev/null || true
+        fi
+    fi
+    
     sleep 2
     
     generate_coverage_reports
@@ -444,9 +628,10 @@ main() {
 # Parse command line arguments
 case "${1:-}" in
     --help|-h)
-        echo "Usage: $0 [fuzzer] [run_number] [OPTIONS]"
+        echo "Usage: $0 [target] [fuzzer] [run_number] [OPTIONS]"
         echo ""
         echo "Parameters:"
+        echo "  target      : iec104 或 freyrscada-iec104 (默认: iec104)"
         echo "  fuzzer      : afl-ics, aflnet, chatafl, a2, a3 (默认: aflnet)"
         echo "  run_number  : 实验次数 (默认: 1)"
         echo ""
@@ -457,12 +642,16 @@ case "${1:-}" in
         echo "  --monitor-only Start coverage server with monitoring only"
         echo ""
         echo "Examples:"
-        echo "  $0 aflnet 1           # 分析 IEC104 的 aflnet 结果"
-        echo "  $0 afl-ics 1          # 分析 IEC104 的 afl-ics 结果"
-        echo "  $0 a2 2               # 分析 IEC104 第2次实验"
+        echo "  $0 iec104 aflnet 1              # 分析 iec104 的 aflnet 结果"
+        echo "  $0 freyrscada-iec104 afl-ics 1  # 分析 freyrscada-iec104 的 afl-ics 结果"
+        echo "  $0 iec104 a2 2                  # 分析 iec104 第2次实验"
+        echo ""
+        echo "Supported targets:"
+        echo "  - iec104:            Original lib60870 IEC104 implementation"
+        echo "  - freyrscada-iec104: FreyrSCADA IEC104 implementation"
         echo ""
         echo "This script performs comprehensive coverage analysis with server monitoring by:"
-        echo "1. Rebuilding IEC104 with coverage instrumentation"
+        echo "1. Rebuilding the target implementation with coverage instrumentation"
         echo "2. Starting a coverage-enabled server with automatic restart monitoring"
         echo "3. Replaying test cases using replay-iec104.sh"
         echo "4. Generating coverage reports using gcovr"
@@ -487,7 +676,13 @@ case "${1:-}" in
         ;;
     --monitor-only)
         check_prerequisites
-        if [ ! -f "$IEC104_DIR/test/iec104_monitor" ]; then
+        if [ "$TARGET_IMPL" = "freyrscada-iec104" ]; then
+            SERVER_EXEC="$IEC104_DIR/IEC104-Linux-SDK/LinuxSDK/x86_64/output/iec104servertest"
+        else
+            SERVER_EXEC="$IEC104_DIR/test/iec104_monitor"
+        fi
+        
+        if [ ! -f "$SERVER_EXEC" ]; then
             print_error "Coverage server binary not found. Run '$0 --rebuild-only' first."
             exit 1
         fi

@@ -73,9 +73,11 @@ libplctag/
 libmodbus/
 freyrscada-iec104-temp/
 freyrscada-temp2/
+freyrscada-iec104/
 EIPScanner/
 eipscanner*
 OpENer
+IEC104/
 
 
 

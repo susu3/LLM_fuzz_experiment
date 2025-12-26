@@ -1,28 +1,26 @@
 #!/bin/bash
 
-# 参数: ./replay-iec104.sh [target] [fuzzer] [run_number]
-# 示例: ./replay-iec104.sh iec104 aflnet 1
-#       ./replay-iec104.sh freyrscada-iec104 afl-ics 1
+# 参数: ./replay-ethernetip.sh [target] [fuzzer] [run_number]
+# 示例: ./replay-ethernetip.sh opener aflnet 1
+#       ./replay-ethernetip.sh eipscanner afl-ics 1
 
-# 参数解析（可选，默认为 iec104）
-TARGET_IMPL="${1:-iec104}"     # iec104 或 freyrscada-iec104
+# 参数解析（可选，默认为 opener）
+TARGET_IMPL="${1:-opener}"     # opener 或 eipscanner
 FUZZER="${2:-aflnet}"          # afl-ics, aflnet, chatafl, a2, a3
 RUN_NUM="${3:-1}"              # 实验次数
 
 # 设置输入文件目录和aflnet-replay路径
-INPUT_DIR="/fuzzing/out-iec104/replayable-queue"  # 默认路径，会被下面覆盖
 AFLNET_REPLAY="/home/ecs-user/AFL-ICS/aflnet-replay"  # 使用绝对路径
-TARGET="IEC104"  # 协议名称（IEC104使用与MODBUS类似的重放方式）
+TARGET="ETHERNETIP"  # 协议名称
+TARGET_PORT="44818"  # EtherNet/IP 使用 44818
 
-# 根据目标实现调整端口和路径
+# 根据目标实现调整路径
 BASE_DIR="/home/ecs-user/LLM_fuzz_experiment"
 
-if [ "$TARGET_IMPL" = "freyrscada-iec104" ]; then
-    TARGET_PORT="2404"
-    INPUT_DIR="$BASE_DIR/results/freyrscada-iec104-${FUZZER}-${RUN_NUM}/replayable-queue"
+if [ "$TARGET_IMPL" = "eipscanner" ]; then
+    INPUT_DIR="$BASE_DIR/results/eipscanner-${FUZZER}-${RUN_NUM}/replayable-queue"
 else
-    TARGET_PORT="2404"  # iec104 也使用 2404 端口
-    INPUT_DIR="$BASE_DIR/results/iec104-${FUZZER}-${RUN_NUM}/replayable-queue"
+    INPUT_DIR="$BASE_DIR/results/opener-${FUZZER}-${RUN_NUM}/replayable-queue"
 fi
 
 # 如果 replayable-queue 不存在，尝试 queue 目录
@@ -57,18 +55,16 @@ for TESTCASE in "$INPUT_DIR"/id:*; do
         echo "Replay succeeded for $TESTCASE"
         break  # 成功时退出 while 循环
       else
-	RETRY_COUNT=$((RETRY_COUNT+1))
-        echo "Replay failed for $TESTCASE. Retrying in 10 seconds..."
-        sleep 10
+        echo "Replay failed for $TESTCASE, attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES"
+        RETRY_COUNT=$((RETRY_COUNT + 1))
+        sleep 1  # 在重试之前稍作等待
       fi
     done
 
-    #处理错误
-    if [ "$RETRY_COUNT" -eq "$MAX_RETRIES" ]; then
-	echo "Replay failed after $MAX_RETRIES attempts for $TESTCASE. Skipping"
+    if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+      echo "Warning: $TESTCASE failed after $MAX_RETRIES attempts"
     fi
   fi
 done
 
-echo "All test cases replayed."
-
+echo "Replay completed for all test cases in $INPUT_DIR"
