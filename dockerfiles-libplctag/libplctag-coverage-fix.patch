@@ -1,0 +1,23 @@
+--- a/src/tests/modbus_server/modbus_server.c
++++ b/src/tests/modbus_server/modbus_server.c
+@@ -75,9 +75,19 @@ typedef struct {
+ #define MAX_CLIENTS 100
+ 
+ /* Global variables for signal handling */
+ static volatile sig_atomic_t g_running = 1;
+ 
++/* Declare __gcov_flush for coverage data flushing */
++#ifdef __GNUC__
++extern void __gcov_flush(void);
++#endif
++
+ static void signal_handler(int signum) {
++    /* Flush coverage data before exiting */
++#ifdef __GNUC__
++    __gcov_flush();
++#endif
++    
+     (void)signum;
+     g_running = 0;
+ }
+

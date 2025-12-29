@@ -1,0 +1,21 @@
+diff --git a/examples/CMakeLists.txt b/examples/CMakeLists.txt
+index 1234567..abcdefg 100644
+--- a/examples/CMakeLists.txt
++++ b/examples/CMakeLists.txt
+@@ -22,6 +22,10 @@ add_executable(discovery_example DiscoveryManagerExample.cpp)
+ add_executable(yaskawa_assembly_object_example vendors/yaskawa/mp3300iec/Yaskawa_AssemblyObjectExample.cpp)
+ target_link_libraries(yaskawa_assembly_object_example EIPScanner)
+ 
++# Fuzzing server harness
++add_executable(eip_server_harness EIPServerHarness.cpp)
++target_link_libraries(eip_server_harness EIPScanner)
++
+ if(WIN32)
+   target_link_libraries(explicit_messaging ws2_32)
+   target_link_libraries(file_object_example ws2_32)
+@@ -30,4 +34,5 @@ if(WIN32)
+   target_link_libraries(parameter_object_example ws2_32)
+   target_link_libraries(discovery_example ws2_32)
+   target_link_libraries(yaskawa_assembly_object_example ws2_32)
++  target_link_libraries(eip_server_harness ws2_32)
+ endif()

@@ -1,0 +1,28 @@
+--- a/samples/svrskel/CMakeLists.txt
++++ b/samples/svrskel/CMakeLists.txt
+@@ -1,14 +1,22 @@
+ cmake_minimum_required(VERSION 2.6.0)
+ 
+-set(sources svrskel.c)
++set(sources svrskel.c svrskel_afl.c svrskel_afl_coverage.c)
+ 
+ if (CMAKE_HOST_WIN32)
+     set(sources ${sources} ${CMAKE_CURRENT_SOURCE_DIR}/../win32rsrc/rsrc.rc)
+ endif ()
+ 
+-add_executable(svrskel ${sources})
++add_executable(svrskel svrskel.c)
++
++add_executable(svrskel_afl svrskel_afl.c)
++
++add_executable(svrskel_afl_coverage svrskel_afl_coverage.c)
+ 
+ target_link_libraries(svrskel PRIVATE slmp)
+ 
++target_link_libraries(svrskel_afl PRIVATE slmp)
++
++target_link_libraries(svrskel_afl_coverage PRIVATE slmp)
++
+ include(GNUInstallDirs)
+ install(TARGETS svrskel
+

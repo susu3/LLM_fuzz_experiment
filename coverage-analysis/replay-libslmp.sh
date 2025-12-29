@@ -1,30 +1,18 @@
 #!/bin/bash
 
-# 参数: ./replay-modbus.sh [target] [fuzzer] [run_number]
-# 示例: ./replay-modbus.sh libmodbus aflnet 1
-#       ./replay-modbus.sh libplctag afl-ics 1
+# 参数: ./replay-libslmp.sh [fuzzer] [run_number]
+# 示例: ./replay-libslmp.sh aflnet 1
 
-# 参数解析（可选，默认为 libmodbus）
-TARGET_IMPL="${1:-libmodbus}"  # libmodbus 或 libplctag
-FUZZER="${2:-aflnet}"          # afl-ics, aflnet, chatafl, a2
-RUN_NUM="${3:-1}"              # 实验次数
+# 参数解析
+FUZZER="${1:-aflnet}"          # afl-ics, aflnet, chatafl, a2, a3
+RUN_NUM="${2:-1}"              # 实验次数
 
 # 设置输入文件目录和aflnet-replay路径
-INPUT_DIR="/fuzzing/out-modbus/replayable-queue"  # 默认路径，会被下面覆盖
-AFLNET_REPLAY="/home/ecs-user/AFL-ICS/aflnet-replay"  # 使用绝对路径
-TARGET="MODBUS"  # 协议名称
-TARGET_PORT="1502"  # 默认端口
-
-# 根据目标程序调整路径（使用绝对路径）
 BASE_DIR="/home/ecs-user/LLM_fuzz_experiment"
-
-if [ "$TARGET_IMPL" = "libplctag" ]; then
-    INPUT_DIR="$BASE_DIR/results/libplctag-${FUZZER}-${RUN_NUM}/replayable-queue"
-    TARGET_PORT="5502"  # libplctag 使用 5502
-else
-    INPUT_DIR="$BASE_DIR/results/libmodbus-${FUZZER}-${RUN_NUM}/replayable-queue"
-    TARGET_PORT="1502"  # libmodbus 使用 1502
-fi
+INPUT_DIR="$BASE_DIR/results/libslmp2-${FUZZER}-${RUN_NUM}/replayable-queue"
+AFLNET_REPLAY="/home/ecs-user/AFL-ICS/aflnet-replay"  # 使用绝对路径
+TARGET="SLMPB"  # 协议名称 (SLMPB: SLMP Binary)
+TARGET_PORT="8888"  # 端口
 
 # 如果 replayable-queue 不存在，尝试 queue 目录
 if [ ! -d "$INPUT_DIR" ]; then
@@ -49,6 +37,7 @@ echo "========================================"
 echo "Input directory: $INPUT_DIR"
 echo "Total test cases found: $TOTAL_TESTCASES"
 echo "Target port: $TARGET_PORT"
+echo "Protocol: $TARGET"
 echo "========================================"
 
 TESTCASE_COUNT=0
@@ -91,7 +80,7 @@ for TESTCASE in "$INPUT_DIR"/id:*; do
       fi
     done
 
-    #处理错误
+    # 处理错误
     if [ "$RETRY_COUNT" -eq "$MAX_RETRIES" ]; then
       echo "✗ Warning: $TESTCASE failed after $MAX_RETRIES attempts"
       FAIL_COUNT=$((FAIL_COUNT + 1))
@@ -105,5 +94,10 @@ echo "Replay Summary:"
 echo "  Total test cases: $TESTCASE_COUNT"
 echo "  Successful:       $SUCCESS_COUNT"
 echo "  Failed:           $FAIL_COUNT"
-echo "  Success rate:     $(awk "BEGIN {printf \"%.2f\", ($SUCCESS_COUNT/$TESTCASE_COUNT)*100}")%"
+if [ "$TESTCASE_COUNT" -gt 0 ]; then
+  echo "  Success rate:     $(awk "BEGIN {printf \"%.2f\", ($SUCCESS_COUNT/$TESTCASE_COUNT)*100}")%"
+else
+  echo "  Success rate:     N/A (no test cases)"
+fi
 echo "========================================"
+

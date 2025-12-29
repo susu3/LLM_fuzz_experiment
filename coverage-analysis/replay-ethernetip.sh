@@ -50,6 +50,17 @@ for TESTCASE in "$INPUT_DIR"/id:*; do
 
     # 执行 aflnet-replay 并处理失败的情况
     while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+      # 检查服务器端口是否可用（等待最多30秒）
+      port_check_count=0
+      while ! nc -z 127.0.0.1 "$TARGET_PORT" 2>/dev/null && [ $port_check_count -lt 30 ]; do
+        sleep 1
+        port_check_count=$((port_check_count + 1))
+      done
+      
+      if [ $port_check_count -ge 30 ]; then
+        echo "Warning: Server port $TARGET_PORT not responding after 30 seconds"
+      fi
+      
       "$AFLNET_REPLAY" "$TESTCASE" "$TARGET" "$TARGET_PORT"
       if [ $? -eq 0 ]; then
         echo "Replay succeeded for $TESTCASE"
@@ -57,7 +68,8 @@ for TESTCASE in "$INPUT_DIR"/id:*; do
       else
         echo "Replay failed for $TESTCASE, attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES"
         RETRY_COUNT=$((RETRY_COUNT + 1))
-        sleep 1  # 在重试之前稍作等待
+        # 等待更长时间让服务器恢复
+        sleep 3
       fi
     done
 

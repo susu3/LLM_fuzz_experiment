@@ -68,7 +68,7 @@ check_prerequisites() {
     print_status "Checking prerequisites..."
     
     if [ ! -d "$MODBUS_DIR" ]; then
-        print_error "Libmodbus directory not found: $MODBUS_DIR"
+        print_error "$TARGET_IMPL directory not found: $MODBUS_DIR"
         exit 1
     fi
     
@@ -108,11 +108,30 @@ rebuild_with_coverage() {
         # libplctag 使用 CMake
         print_status "Using CMake build system..."
         
+        # 应用覆盖率修复patch（添加 __gcov_flush 支持）
+        if [ -f "$BASE_DIR/dockerfiles-libplctag/libplctag-coverage-fix.patch" ]; then
+            if ! grep -q "__gcov_flush" src/tests/modbus_server/modbus_server.c 2>/dev/null; then
+                print_status "Applying libplctag coverage fix patch (adds __gcov_flush)..."
+                patch -p1 < "$BASE_DIR/dockerfiles-libplctag/libplctag-coverage-fix.patch"
+                print_status "Coverage patch applied successfully"
+            else
+                print_status "Coverage patch already applied, skipping..."
+            fi
+        else
+            print_warning "Coverage patch not found. modbus_server may not flush .gcda files properly."
+        fi
+        
         # 彻底清理之前的覆盖率数据
         print_status "Cleaning previous coverage data..."
+        OLD_GCDA=$(find . -name "*.gcda" 2>/dev/null | wc -l)
+        OLD_GCNO=$(find . -name "*.gcno" 2>/dev/null | wc -l)
+        print_status "Found $OLD_GCDA old .gcda files and $OLD_GCNO old .gcno files"
+        
         rm -rf build-coverage
         find . -name "*.gcda" -delete 2>/dev/null || true
         find . -name "*.gcno" -delete 2>/dev/null || true
+        
+        print_status "Old coverage data cleaned. Starting fresh build..."
         
         mkdir -p build-coverage
         cd build-coverage
@@ -133,9 +152,15 @@ rebuild_with_coverage() {
         
         # 彻底清理之前的覆盖率数据
         print_status "Cleaning previous coverage data..."
+        OLD_GCDA=$(find . -name "*.gcda" 2>/dev/null | wc -l)
+        OLD_GCNO=$(find . -name "*.gcno" 2>/dev/null | wc -l)
+        print_status "Found $OLD_GCDA old .gcda files and $OLD_GCNO old .gcno files"
+        
         make clean || true
         find . -name "*.gcda" -delete 2>/dev/null || true
         find . -name "*.gcno" -delete 2>/dev/null || true
+        
+        print_status "Old coverage data cleaned. Starting fresh build..."
         
         # Ensure coverage flags are used
         print_status "Configuring with coverage flags: $CFLAGS"
@@ -215,7 +240,7 @@ rebuild_with_coverage() {
         print_status "Coverage instrumentation successful: .gcno files generated at compile time"
     fi
     
-    print_status "Libmodbus rebuilt with coverage instrumentation"
+    print_status "$TARGET_IMPL rebuilt with coverage instrumentation"
 }
 
 # Check if coverage server is running
@@ -242,26 +267,38 @@ is_coverage_server_running() {
 start_coverage_server() {
     print_status "Starting coverage-enabled modbus server with monitoring..."
     
-    # Kill any existing servers (使用精确匹配，避免杀死其他进程)
-    pkill -f "server-coverage $SERVER_PORT" || true
-    pkill -f "modbus_server --listen.*$SERVER_PORT" || true
-    pkill -f "\./server-coverage" || true
-    pkill -f "\./modbus_server" || true
+    # Kill any existing servers more aggressively
+    pkill -9 -f "server-coverage" 2>/dev/null || true
+    pkill -9 -f "modbus_server" 2>/dev/null || true
+    
+    # Force release the port using fuser
+    fuser -k $SERVER_PORT/tcp 2>/dev/null || true
     sleep 2
+    
+    # Double check and wait for port to be released
+    wait_count=0
+    while ss -tuln 2>/dev/null | grep -q ":$SERVER_PORT " && [ $wait_count -lt 10 ]; do
+        print_status "Waiting for port $SERVER_PORT to be released..."
+        fuser -k $SERVER_PORT/tcp 2>/dev/null || true
+        sleep 1
+        wait_count=$((wait_count + 1))
+    done
     
     # Start the coverage-enabled server
     cd "$MODBUS_DIR"
     
     if [ "$BUILD_TYPE" = "cmake" ]; then
         # libplctag 使用 CMake 构建的服务器
-        cd build-coverage/bin_dist
+        # 从 build-coverage 目录启动以确保 .gcda 文件写入正确位置
+        cd build-coverage
         
-        if [ ! -f "./modbus_server" ]; then
+        if [ ! -f "./bin_dist/modbus_server" ]; then
             print_error "modbus_server binary not found. Please run rebuild first."
             exit 1
         fi
         
-        ./modbus_server --listen 127.0.0.1:$SERVER_PORT &
+        # Start server with correct working directory for .gcda files
+        ./bin_dist/modbus_server --listen 127.0.0.1:$SERVER_PORT &
         SERVER_PID=$!
     else
         # libmodbus 使用单独编译的服务器
@@ -304,16 +341,26 @@ monitor_coverage_server() {
                 print_status "Restart attempt $SERVER_RESTART_COUNT of $MAX_SERVER_RESTART_ATTEMPTS"
                 
                 # 强制清理可能残留的服务器进程
-                pkill -9 -f "server-coverage $SERVER_PORT" 2>/dev/null || true
-                pkill -9 -f "modbus_server --listen.*$SERVER_PORT" 2>/dev/null || true
+                pkill -9 -f "server-coverage" 2>/dev/null || true
+                pkill -9 -f "modbus_server" 2>/dev/null || true
                 
-                # 等待端口释放
+                # 使用 fuser 强制释放端口
+                fuser -k $SERVER_PORT/tcp 2>/dev/null || true
                 sleep 2
+                
+                # 确保端口已释放
+                port_wait=0
+                while ss -tuln 2>/dev/null | grep -q ":$SERVER_PORT " && [ $port_wait -lt 10 ]; do
+                    print_status "Waiting for port $SERVER_PORT to be released... ($port_wait/10)"
+                    fuser -k -9 $SERVER_PORT/tcp 2>/dev/null || true
+                    sleep 1
+                    port_wait=$((port_wait + 1))
+                done
                 
                 cd "$MODBUS_DIR"
                 if [ "$BUILD_TYPE" = "cmake" ]; then
-                    cd build-coverage/bin_dist
-                    ./modbus_server --listen 127.0.0.1:$SERVER_PORT &
+                    cd build-coverage
+                    ./bin_dist/modbus_server --listen 127.0.0.1:$SERVER_PORT &
                 else
                     cd tests
                     ./server-coverage $SERVER_PORT &
@@ -387,9 +434,18 @@ run_replay_with_monitoring() {
     # Check if .gcda files were generated during execution (runtime coverage data)
     print_status "Checking for .gcda files after server execution..."
     GCDA_COUNT=$(find "$MODBUS_DIR" -name "*.gcda" 2>/dev/null | wc -l)
-    GCDA_COUNT_TESTS=$(find "$MODBUS_DIR/tests" -name "*.gcda" 2>/dev/null | wc -l)
-    print_status "Found $GCDA_COUNT .gcda files total in libmodbus"
-    print_status "Found $GCDA_COUNT_TESTS .gcda files in tests directory"
+    
+    if [ "$BUILD_TYPE" = "cmake" ]; then
+        # libplctag: 检查 build-coverage 目录
+        GCDA_COUNT_BUILD=$(find "$MODBUS_DIR/build-coverage" -name "*.gcda" 2>/dev/null | wc -l)
+        print_status "Found $GCDA_COUNT .gcda files total in $TARGET_IMPL"
+        print_status "Found $GCDA_COUNT_BUILD .gcda files in build-coverage directory"
+    else
+        # libmodbus: 检查 tests 目录
+        GCDA_COUNT_TESTS=$(find "$MODBUS_DIR/tests" -name "*.gcda" 2>/dev/null | wc -l)
+        print_status "Found $GCDA_COUNT .gcda files total in $TARGET_IMPL"
+        print_status "Found $GCDA_COUNT_TESTS .gcda files in tests directory"
+    fi
     
     if [ "$GCDA_COUNT" -eq 0 ]; then
         print_warning "No .gcda files found. The coverage-enabled server may not have executed properly or no code was covered."
@@ -588,16 +644,36 @@ cleanup() {
     # Stop server monitoring
     stop_server_monitoring
     
-    # Kill the coverage server
+    # Kill the coverage server gracefully first (to ensure .gcda flush)
     if [ ! -z "$SERVER_PID" ]; then
-        kill $SERVER_PID 2>/dev/null || true
+        print_status "Sending SIGTERM to server (PID: $SERVER_PID) to flush coverage data..."
+        kill -TERM $SERVER_PID 2>/dev/null || true
+        
+        # Wait for server to flush .gcda files
+        for i in {1..5}; do
+            if ! ps -p $SERVER_PID > /dev/null 2>&1; then
+                print_status "Server exited gracefully"
+                break
+            fi
+            sleep 1
+        done
+        
+        # Force kill if still running
+        if ps -p $SERVER_PID > /dev/null 2>&1; then
+            print_warning "Server didn't exit, forcing termination..."
+            kill -9 $SERVER_PID 2>/dev/null || true
+        fi
     fi
     
-    # Kill any remaining server processes (使用更精确的匹配，避免杀死 SSH 等进程)
-    pkill -f "server-coverage $SERVER_PORT" || true
-    pkill -f "modbus_server --listen" || true
-    pkill -f "\./server-coverage" || true
-    pkill -f "\./modbus_server" || true
+    # Kill any remaining server processes gracefully, then forcefully
+    pkill -TERM -f "server-coverage $SERVER_PORT" 2>/dev/null || true
+    pkill -TERM -f "modbus_server --listen" 2>/dev/null || true
+    sleep 1
+    pkill -9 -f "server-coverage" 2>/dev/null || true
+    pkill -9 -f "modbus_server" 2>/dev/null || true
+    
+    # Ensure port is released
+    fuser -k -9 $SERVER_PORT/tcp 2>/dev/null || true
     
     # Kill monitor process if still running
     if [ ! -z "$MONITOR_PID" ]; then
@@ -620,7 +696,29 @@ main() {
     # Stop the server before generating reports
     print_status "Stopping coverage-enabled server..."
     stop_server_monitoring
-    kill $SERVER_PID 2>/dev/null || true
+    
+    # Gracefully stop server to ensure .gcda files are written
+    if [ ! -z "$SERVER_PID" ]; then
+        print_status "Sending SIGTERM to server (PID: $SERVER_PID) to flush coverage data..."
+        kill -TERM $SERVER_PID 2>/dev/null || true
+        
+        # Wait for server to gracefully exit and write .gcda files
+        for i in {1..10}; do
+            if ! ps -p $SERVER_PID > /dev/null 2>&1; then
+                print_status "Server exited gracefully, .gcda files should be written"
+                break
+            fi
+            print_status "Waiting for server to flush coverage data... ($i/10)"
+            sleep 1
+        done
+        
+        # If still running, force terminate
+        if ps -p $SERVER_PID > /dev/null 2>&1; then
+            print_warning "Server didn't exit gracefully after 10 seconds, forcing termination..."
+            kill -9 $SERVER_PID 2>/dev/null || true
+        fi
+    fi
+    
     sleep 2
     
     generate_coverage_reports
