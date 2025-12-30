@@ -18,55 +18,11 @@ LLM_fuzz_experiment/
 │   ├── Dockerfile.libmodbus.a2
 │   └── Dockerfile.libmodbus.a3
 ├── dockerfiles-iec104/       # IEC104的Dockerfile
-│   ├── Dockerfile.iec104.afl-ics
-│   ├── Dockerfile.iec104.aflnet
-│   ├── Dockerfile.iec104.chatafl
-│   ├── Dockerfile.iec104.a2
-│   ├── Dockerfile.iec104.a3
-│   └── iec104-fuzzing.patch
 ├── dockerfiles-freyrscada-iec104/  # FreyrSCADA IEC104的Dockerfile
-│   ├── Dockerfile.freyrscada-iec104.afl-ics
-│   ├── Dockerfile.freyrscada-iec104.aflnet
-│   ├── Dockerfile.freyrscada-iec104.chatafl
-│   ├── Dockerfile.freyrscada-iec104.a2
-│   ├── Dockerfile.freyrscada-iec104.a3
-│   └── freyrscada-iec104-fuzzing.patch
 ├── dockerfiles-libplctag/    # Libplctag的Dockerfile
-│   ├── Dockerfile.libplctag.afl-ics
-│   ├── Dockerfile.libplctag.aflnet
-│   ├── Dockerfile.libplctag.chatafl
-│   ├── Dockerfile.libplctag.a2
-│   ├── Dockerfile.libplctag.a3
-│   └── libplctag-coverage-fix.patch
 ├── dockerfiles-libslmp2/     # libslmp2的Dockerfile
-│   ├── Dockerfile.libslmp2.afl-ics
-│   ├── Dockerfile.libslmp2.aflnet
-│   ├── Dockerfile.libslmp2.chatafl
-│   ├── Dockerfile.libslmp2.a2
-│   ├── Dockerfile.libslmp2.a3
-│   ├── svrskel_afl.c
-│   ├── svrskel_afl_coverage.c
-│   ├── add-svrskel-afl.patch
-│   ├── add-svrskel-coverage.patch
-│   └── seeds/
-├── dockerfiles-opener/       # OpENer EtherNet/IP的Dockerfile
-│   ├── Dockerfile.opener.afl-ics
-│   ├── Dockerfile.opener.aflnet
-│   ├── Dockerfile.opener.chatafl
-│   ├── Dockerfile.opener.a2
-│   ├── Dockerfile.opener.a3
-│   ├── opener-fuzzing-fix.patch
-│   ├── opener-coverage-fix.patch
-│   └── seeds/
-├── dockerfiles-eipscanner/   # EIPScanner EtherNet/IP的Dockerfile
-│   ├── Dockerfile.eipscanner.afl-ics
-│   ├── Dockerfile.eipscanner.aflnet
-│   ├── Dockerfile.eipscanner.chatafl
-│   ├── Dockerfile.eipscanner.a2
-│   ├── Dockerfile.eipscanner.a3
-│   ├── eipscanner-cmake.patch
-│   ├── EIPServerHarness.cpp
-│   └── seeds/
+├── dockerfiles-opener/       # OpENer的Dockerfile
+├── dockerfiles-eipscanner/   # EIPScanner的Dockerfile
 ├── scripts/                  # 管理脚本
 │   ├── start_all.sh         # 启动Libmodbus所有容器
 │   ├── stop_all.sh          # 停止Libmodbus所有容器
@@ -88,8 +44,7 @@ LLM_fuzz_experiment/
 │   ├── coverage-ethernetip.sh  # EtherNet/IP覆盖率分析
 │   ├── replay-ethernetip.sh    # EtherNet/IP测试用例重放
 │   ├── coverage-libslmp.sh  # SLMP覆盖率分析
-│   ├── replay-libslmp.sh    # SLMP测试用例重放
-│   └── README-libslmp.md    # SLMP覆盖率脚本说明
+│   └── replay-libslmp.sh    # SLMP测试用例重放
 ├── results/                  # 结果输出目录
 ├── coverage-reports/         # 覆盖率报告目录
 ├── docker-compose.yml        # Libmodbus容器编排文件
@@ -231,18 +186,6 @@ ls -lh ./results/
 覆盖率报告保存在 `coverage-reports/` 目录：
 - 行覆盖率报告: `coverage-line-{target}-{fuzzer}-{run}.txt`
 - 分支覆盖率报告: `coverage-branch-{target}-{fuzzer}-{run}.txt`
-
-### 支持的目标实现
-
-| 协议 | 实现库 | 说明 |
-|------|--------|------|
-| Modbus | libmodbus | 原始 libmodbus 实现 |
-| Modbus | libplctag | libplctag 的 Modbus 服务器 |
-| IEC104 | iec104 | lib60870 IEC104 实现 |
-| IEC104 | freyrscada-iec104 | FreyrSCADA IEC104 实现 |
-| EtherNet/IP | opener | OpENer 实现 |
-| EtherNet/IP | eipscanner | EIPScanner 实现 |
-| SLMP | libslmp2 | libslmp2 实现 |
 
 ## 🚨 注意事项
 
