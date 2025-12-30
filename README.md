@@ -11,44 +11,95 @@
 
 ```
 LLM_fuzz_experiment/
-├── dockerfiles/           # Libmodbus的Dockerfile
+├── dockerfiles/              # Libmodbus的Dockerfile
 │   ├── Dockerfile.libmodbus.afl-ics
 │   ├── Dockerfile.libmodbus.aflnet
 │   ├── Dockerfile.libmodbus.chatafl
 │   ├── Dockerfile.libmodbus.a2
 │   └── Dockerfile.libmodbus.a3
-├── dockerfiles-iec104/    # IEC104的Dockerfile
+├── dockerfiles-iec104/       # IEC104的Dockerfile
 │   ├── Dockerfile.iec104.afl-ics
 │   ├── Dockerfile.iec104.aflnet
 │   ├── Dockerfile.iec104.chatafl
 │   ├── Dockerfile.iec104.a2
-│   └── Dockerfile.iec104.a3
-├── dockerfiles-libplctag/ # Libplctag的Dockerfile
+│   ├── Dockerfile.iec104.a3
+│   └── iec104-fuzzing.patch
+├── dockerfiles-freyrscada-iec104/  # FreyrSCADA IEC104的Dockerfile
+│   ├── Dockerfile.freyrscada-iec104.afl-ics
+│   ├── Dockerfile.freyrscada-iec104.aflnet
+│   ├── Dockerfile.freyrscada-iec104.chatafl
+│   ├── Dockerfile.freyrscada-iec104.a2
+│   ├── Dockerfile.freyrscada-iec104.a3
+│   └── freyrscada-iec104-fuzzing.patch
+├── dockerfiles-libplctag/    # Libplctag的Dockerfile
 │   ├── Dockerfile.libplctag.afl-ics
 │   ├── Dockerfile.libplctag.aflnet
 │   ├── Dockerfile.libplctag.chatafl
 │   ├── Dockerfile.libplctag.a2
-│   └── Dockerfile.libplctag.a3
-├── scripts/               # 管理脚本
-│   ├── start_all.sh      # 启动Libmodbus所有容器
-│   ├── stop_all.sh       # 停止Libmodbus所有容器
-│   ├── copy_results.sh   # 拷贝Libmodbus结果
-│   ├── start_iec104.sh   # 启动IEC104所有容器
-│   ├── stop_iec104.sh    # 停止IEC104所有容器
-│   ├── copy_results_iec104.sh  # 拷贝IEC104结果
-│   ├── start_libplctag.sh      # 启动Libplctag所有容器
-│   ├── stop_libplctag.sh       # 停止Libplctag所有容器
-│   └── copy_results_libplctag.sh  # 拷贝Libplctag结果
-├── coverage-analysis/    # 覆盖率分析脚本
-│   ├── coverage-modbus.sh   # Libmodbus覆盖率分析
-│   ├── replay-modbus.sh     # Libmodbus测试用例重放
+│   ├── Dockerfile.libplctag.a3
+│   └── libplctag-coverage-fix.patch
+├── dockerfiles-libslmp2/     # libslmp2的Dockerfile
+│   ├── Dockerfile.libslmp2.afl-ics
+│   ├── Dockerfile.libslmp2.aflnet
+│   ├── Dockerfile.libslmp2.chatafl
+│   ├── Dockerfile.libslmp2.a2
+│   ├── Dockerfile.libslmp2.a3
+│   ├── svrskel_afl.c
+│   ├── svrskel_afl_coverage.c
+│   ├── add-svrskel-afl.patch
+│   ├── add-svrskel-coverage.patch
+│   └── seeds/
+├── dockerfiles-opener/       # OpENer EtherNet/IP的Dockerfile
+│   ├── Dockerfile.opener.afl-ics
+│   ├── Dockerfile.opener.aflnet
+│   ├── Dockerfile.opener.chatafl
+│   ├── Dockerfile.opener.a2
+│   ├── Dockerfile.opener.a3
+│   ├── opener-fuzzing-fix.patch
+│   ├── opener-coverage-fix.patch
+│   └── seeds/
+├── dockerfiles-eipscanner/   # EIPScanner EtherNet/IP的Dockerfile
+│   ├── Dockerfile.eipscanner.afl-ics
+│   ├── Dockerfile.eipscanner.aflnet
+│   ├── Dockerfile.eipscanner.chatafl
+│   ├── Dockerfile.eipscanner.a2
+│   ├── Dockerfile.eipscanner.a3
+│   ├── eipscanner-cmake.patch
+│   ├── EIPServerHarness.cpp
+│   └── seeds/
+├── scripts/                  # 管理脚本
+│   ├── start_all.sh         # 启动Libmodbus所有容器
+│   ├── stop_all.sh          # 停止Libmodbus所有容器
+│   ├── start_iec104.sh      # 启动IEC104所有容器
+│   ├── stop_iec104.sh       # 停止IEC104所有容器
+│   ├── start_libplctag.sh   # 启动Libplctag所有容器
+│   ├── stop_libplctag.sh    # 停止Libplctag所有容器
+│   ├── start_libslmp2.sh    # 启动libslmp2所有容器
+│   ├── stop_libslmp2.sh     # 停止libslmp2所有容器
+│   ├── start_opener.sh      # 启动OpENer所有容器
+│   ├── stop_opener.sh       # 停止OpENer所有容器
+│   ├── start_eipscanner.sh  # 启动EIPScanner所有容器
+│   └── stop_eipscanner.sh   # 停止EIPScanner所有容器
+├── coverage-analysis/        # 覆盖率分析脚本
+│   ├── coverage-modbus.sh   # Modbus覆盖率分析
+│   ├── replay-modbus.sh     # Modbus测试用例重放
 │   ├── coverage-iec104.sh   # IEC104覆盖率分析
-│   └── replay-iec104.sh     # IEC104测试用例重放
-├── results/              # 结果输出目录
-├── docker-compose.yml    # Libmodbus容器编排文件
-├── docker-compose-iec104.yml    # IEC104容器编排文件
-├── docker-compose-libplctag.yml # Libplctag容器编排文件
-└── env.example          # 环境变量配置示例
+│   ├── replay-iec104.sh     # IEC104测试用例重放
+│   ├── coverage-ethernetip.sh  # EtherNet/IP覆盖率分析
+│   ├── replay-ethernetip.sh    # EtherNet/IP测试用例重放
+│   ├── coverage-libslmp.sh  # SLMP覆盖率分析
+│   ├── replay-libslmp.sh    # SLMP测试用例重放
+│   └── README-libslmp.md    # SLMP覆盖率脚本说明
+├── results/                  # 结果输出目录
+├── coverage-reports/         # 覆盖率报告目录
+├── docker-compose.yml        # Libmodbus容器编排文件
+├── docker-compose-iec104.yml # IEC104容器编排文件
+├── docker-compose-freyrscada-iec104.yml  # FreyrSCADA IEC104容器编排文件
+├── docker-compose-libplctag.yml  # Libplctag容器编排文件
+├── docker-compose-libslmp2.yml   # libslmp2容器编排文件
+├── docker-compose-opener.yml     # OpENer容器编排文件
+├── docker-compose-eipscanner.yml # EIPScanner容器编排文件
+└── README.md                # 项目说明文档
 ```
 
 ## 🚀 快速开始
@@ -78,8 +129,6 @@ newgrp docker
 # 第3次实验
 ./scripts/start_all.sh 3
 ```
-
-> 💡 **其他协议**: 使用 `./scripts/start_iec104.sh` 或 `./scripts/start_libplctag.sh` 测试其他协议
 
 容器将自动开始运行模糊测试，无需手动干预。每次实验会创建独立的输出目录。
 
@@ -152,13 +201,7 @@ ls -lh ./results/
 
 要测试其他目标程序，只需简单修改：
 
-### 方法1：手动修改Dockerfile
-
-1. 修改 `dockerfiles/` 中的 `COPY` 路径指向新目标
-2. 修改启动脚本中的模糊测试命令参数（端口、协议等）
-3. 重新构建: `docker compose build`
-
-### 方法2：创建新的Dockerfile和compose文件
+### 创建新的Dockerfile和compose文件
 
 1. 复制 `Dockerfile.libmodbus.*` 为 `Dockerfile.newtarget.*`
 2. 复制 `docker-compose.yml` 为 `docker-compose-newtarget.yml`
@@ -183,11 +226,23 @@ ls -lh ./results/
 ./coverage-analysis/coverage-modbus.sh libmodbus afl-ics 1
 ```
 
-> 💡 **其他协议**: IEC104 使用 `./coverage-analysis/coverage-iec104.sh [fuzzer] [run_num]`
+### 覆盖率报告
 
 覆盖率报告保存在 `coverage-reports/` 目录：
-- 行覆盖率报告: `coverage-line-*.txt`
-- 分支覆盖率报告: `coverage-branch-*.txt`
+- 行覆盖率报告: `coverage-line-{target}-{fuzzer}-{run}.txt`
+- 分支覆盖率报告: `coverage-branch-{target}-{fuzzer}-{run}.txt`
+
+### 支持的目标实现
+
+| 协议 | 实现库 | 说明 |
+|------|--------|------|
+| Modbus | libmodbus | 原始 libmodbus 实现 |
+| Modbus | libplctag | libplctag 的 Modbus 服务器 |
+| IEC104 | iec104 | lib60870 IEC104 实现 |
+| IEC104 | freyrscada-iec104 | FreyrSCADA IEC104 实现 |
+| EtherNet/IP | opener | OpENer 实现 |
+| EtherNet/IP | eipscanner | EIPScanner 实现 |
+| SLMP | libslmp2 | libslmp2 实现 |
 
 ## 🚨 注意事项
 
@@ -198,6 +253,21 @@ ls -lh ./results/
 5. **结果文件通过 volume 自动同步**：`./results/` 目录实时包含所有测试结果，无需手动拷贝
 6. 所有模糊测试工具都启用了 ASAN (AddressSanitizer) 进行内存错误检测
 
+## 🎯 支持的协议
+
+本框架支持以下工业控制协议的模糊测试：
+
+| 协议 | 实现库数量 | 支持的实现 |
+|------|-----------|-----------|
+| **Modbus** | 2 | libmodbus, libplctag |
+| **IEC104** | 2 | lib60870, FreyrSCADA |
+| **EtherNet/IP** | 2 | OpENer, EIPScanner |
+| **SLMP** | 1 | libslmp2 |
+
+**总计**: 4种协议，7种实现库
+
+每种实现都支持5种模糊测试工具（AFL-ICS, AFLNet, ChatAFL, A2, A3）的对比测试。
+
 ---
 
-这是一个精简且自动化的实验框架，专注于核心功能：构建Docker容器，自动并行运行模糊测试，可选进入容器查看状态，最后拷贝结果文件。支持 Libmodbus、IEC104 和 Libplctag 三种协议的模糊测试。
+这是一个精简且自动化的实验框架，专注于核心功能：构建Docker容器，自动并行运行模糊测试，可选进入容器查看状态，支持覆盖率分析。支持 Modbus、IEC104、EtherNet/IP 和 SLMP 四种工业控制协议的模糊测试。
