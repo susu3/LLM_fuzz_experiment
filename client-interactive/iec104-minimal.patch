@@ -1,0 +1,25 @@
+--- IEC104/test/main.c.orig	2025-12-11 15:22:18.833913634 +0800
++++ IEC104/test/main.c	2025-12-11 15:27:10.180836292 +0800
+@@ -16,6 +16,7 @@
+ #include "errno.h"
+ #include "sys.h"
+ #include "main.h"
++#include <signal.h>
+ 
+ pthread_mutex_t mutex;
+ pthread_mutex_t mutex2;
+@@ -61,12 +62,12 @@
+ 
+     int socketfd = (*(int *)arg);
+     while(1){
+-        //pthread_mutex_lock(&mutex2);
+         Iec10x_Scheduled(socketfd);      
+         Iec104_StateMachine();
+-        //pthread_mutex_lock(&mutex2);
++        usleep(5000000);                // 每 5 秒执行一次，降低测试帧频率
++        pthread_testcancel();           // ✅ 🔥 允许主线程 cancel 它
+     }
+-    return ((void *)0); 
++    return NULL;
+ }
+ 
